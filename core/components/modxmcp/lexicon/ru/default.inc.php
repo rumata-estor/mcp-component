@@ -6,6 +6,9 @@ $_lang['area_modxmcp_logging'] = 'Логирование';
 $_lang['area_modxmcp_limits'] = 'Ограничения';
 $_lang['area_modxmcp_paths'] = 'Пути';
 $_lang['modxmcp_menu_desc'] = 'Статус MCP-эндпоинта и API-токен.';
+$_lang['modxmcp_graph'] = 'Граф связей';
+$_lang['modxmcp_graph_title'] = 'граф связей';
+$_lang['modxmcp_graph_desc'] = 'Как связаны элементы сайта: что чем используется, битые ссылки, мёртвый код.';
 
 $_lang['modxmcp_cmp_intro'] = 'MCP-эндпоинт этого MODX-сайта. Подключается к клиенту modx-mcp (задайте MODX_MCP_SITE_URL + MODX_MCP_TOKEN).';
 $_lang['modxmcp_cmp_endpoint'] = 'Эндпоинт';

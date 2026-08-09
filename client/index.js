@@ -957,6 +957,24 @@ const toolDefinitions = [
     },
   },
   {
+    name: "modx_dependency_graph",
+    description:
+      "Map how the site's elements WIRE TOGETHER, in one call: which template pulls which chunk/snippet/TV, which snippet renders which chunk, where each TV is attached. Returns `nodes` (elements, with in/out reference degree) + `edges` ([from_index, to_index, kind]) — plus `missing` (tags pointing at a chunk/snippet that does NOT exist — broken references) and `orphans` (elements nothing references — safe-to-delete candidates). Detects references in MODX tags, `&tpl=`chunk`` properties, `$modx->getChunk()/runSnippet()` in PHP, MIGX `inputTV`/`renderchunktpl`, and template↔TV attachments. Token-safe: it scales with the number of ELEMENTS, never with content (resources are counts, not nodes). USE IT: to understand an unfamiliar site's code structure after modx_project_overview; with `focus` before editing or deleting an element, to see exactly what depends on it (cheaper and more precise than modx_find_usages, which is a text search); with format:\"summary\" as a fast health check for broken/dead elements.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        format: { type: "string", enum: ["graph", "summary"], description: "'summary' returns only stats + missing + orphans (cheapest health check). Default 'graph'." },
+        focus: { type: "string", description: "Limit to the neighbourhood of ONE element: its name, or 'type:name' to disambiguate (e.g. 'chunk:header'). Strongly preferred on big sites." },
+        depth: { type: "number", description: "With focus: how many hops to expand (1-5, default 1)." },
+        direction: { type: "string", enum: ["out", "in", "both"], description: "With focus: 'out' = what it uses, 'in' = what uses it, 'both' (default)." },
+        types: { type: "array", items: { type: "string", enum: ["template", "chunk", "snippet", "tv", "plugin", "resource"] }, description: "Keep only these node types." },
+        include_resources: { type: "boolean", description: "Also add resources that elements link to via [[~id]] (default false)." },
+        verify_orphans: { type: "boolean", description: "Cross-check orphan candidates against resource content, so chunks used only inside pages are not falsely listed. Defaults to on for sites under 5000 resources." },
+        max_nodes: { type: "number", description: "Cap on returned nodes (default 1500)." },
+      },
+    },
+  },
+  {
     name: "modx_describe_object",
     description:
       "Schema introspection: list an xPDO class's fields (name + php/db type, null, default) and its primary key, so you use REAL field names instead of guessing. Accepts a class name (e.g. modResource) or an alias (resource/chunk/snippet/template/plugin/tv/category/user/context/setting). Use before create/update on an unfamiliar object.",

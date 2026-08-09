@@ -1,5 +1,46 @@
 # Changelog
 
+## 1.9.0 (2026-08-10)
+
+- **`dependency_graph`** — a structural map of how the site's elements wire together: which
+  template pulls which chunk/snippet/TV, which snippet renders which chunk, where each TV is
+  attached. Returns `nodes` + `edges` (`[from, to, kind]`) and, for free, two things a text
+  search cannot give: **`missing`** (tags pointing at a chunk/snippet that does not exist —
+  genuinely broken references) and **`orphans`** (elements nothing references — dead code).
+  References are detected in MODX tags, chunk-valued properties — inline `&tpl=`…`, an element's
+  **default properties** and **named property sets** (miniShop2 wires `msProducts` →
+  `tpl.msProducts.row` there, not in any content) — `$modx->getChunk()`/`runSnippet()` in PHP,
+  MIGX `inputTV`/`renderchunktpl`, `@CHUNK` bindings and the template↔TV relation. Chunks used
+  by something that isn't an element (a system setting, a miniShop2 order-status e-mail, which
+  references chunks by id) get a `used_by` field and are never called orphans. `focus`/`depth`/`direction` return just the neighbourhood of one
+  element — precise where `find_usages` is a substring match — and `format:"summary"` is a
+  cheap site health check. Token-safe by the same rule as `project_overview`: it scales with
+  the element count, never with content (resources are counts, not nodes). Orphan candidates
+  are cross-checked against resource content so a chunk pasted into a page isn't falsely
+  listed (auto-skipped above 5000 resources; `stats.orphans_verified` says which). Read-only:
+  static elements are read via `getFileContent()`, avoiding the re-save `getContent()` can
+  trigger. New `graph` help topic; `getting_started`/`index` updated to route to it.
+- **Visual graph on its own manager screen** — Components → modxMCP → «Граф связей» (a second
+  menu item and manager action, `?a=graph&namespace=modxmcp`; the settings page links to it and
+  is otherwise unchanged). Three layouts, because one undifferentiated hairball is unreadable:
+  **Слои** (default — each type gets its own horizontal row, in the manager's own tree order:
+  resources, then templates, TVs, chunks, snippets, plugins, with tinted bands and sticky row
+  headers), **Кластеры** (each type pulled into its own cloud) and **Свободно** (pure force).
+  Full-height force-directed map with arrows showing direction of use,
+  nodes sized by reference count, hover-to-highlight, drag/zoom/pan, type filters with counts,
+  a search box with results, clickable sidebar lists of broken references and unused elements,
+  and a details card (category, degrees, `used_by`, incoming/outgoing lists, edit link).
+  Filters for the two kinds of noise that drown a real site: **hide vendor elements** (nodes
+  carry a `vendor` flag — their category, or their name, matches an installed add-on namespace;
+  on a stock install that is ~60% of the graph) and **hide unused**. Plus a density slider,
+  since the useful spacing depends on how big the site is.
+  The central interaction is **isolation**: double-click a node to show only its neighbourhood,
+  with 1–3 hop depth and an uses / used-by switch — that is the "what breaks if I touch this"
+  view. Broken references render as hollow red nodes, orphans get a dashed halo. Repulsion uses
+  a uniform grid so large sites stay interactive. No external libraries (the manager ships none
+  and the transport package stays self-contained). The screen and the MCP action share ONE
+  builder, so what the owner sees and what the AI reasons over cannot drift apart.
+
 ## 1.8.20 (2026-06-25)
 
 - Fix: `edit_element_lines` and `replace_across` now fire the core save events

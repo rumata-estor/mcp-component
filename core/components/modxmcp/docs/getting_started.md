@@ -8,8 +8,13 @@ success envelope is stripped). Errors come back with a clear message — read it
 1. **Orient** — on an unfamiliar site call `modx_project_overview` once: a compact map
    (templates↔TVs, resource/product counts overall + by template/context, a shallow resource
    tree, categories, content types, integrations) with no content, cheap even on huge sites.
+   Then `modx_dependency_graph {format:"summary"}` — one more cheap call that reports broken
+   references and unused elements before you touch anything.
 2. **Locate** — `modx_search_code` (full-text; returns each hit's `line` + `line_text`),
    `modx_find_usages`, `modx_list_resources` / `modx_list_elements` (with a `query` filter).
+   To see how something is WIRED rather than where a string appears, use
+   `modx_dependency_graph {focus:"chunk:header", direction:"out"|"in"}` — it resolves real
+   references instead of substrings (`header` vs `headerNav`). Topic: `graph`.
 3. **Look before you change** — read the target (`modx_get_element`, or `modx_view_element` for
    numbered lines of a big element). On an unfamiliar object, `modx_describe_object` gives the
    real field names + types so you don't guess.
@@ -18,7 +23,9 @@ success envelope is stripped). Errors come back with a clear message — read it
    change, `modx_replace_across`.
 5. **Be safe with destructive ops** — `modx_delete_element`, `modx_bulk_resources` and
    `modx_replace_across` all take `dry_run:true` — preview first, then run for real. Resource
-   delete is **soft** (MODX trash) → restore with `modx_undelete_resource`.
+   delete is **soft** (MODX trash) → restore with `modx_undelete_resource`. Before deleting or
+   renaming an element, check `modx_dependency_graph {focus:"<type>:<name>", direction:"in"}`
+   for everything that depends on it.
 6. **Apply & verify** — clear cache if needed (`modx_clear_cache`), then re-read to confirm.
 
 ## Key facts
@@ -37,4 +44,5 @@ success envelope is stripped). Errors come back with a clear message — read it
 - **Study an add-on.** `modx_get_component_files` + `modx_read_component_file` read installed
   component source; see the `study_component` topic.
 
-Deeper guides via `modx_help`: `tv_input_types`, `migx`, `minishop2`, `acl`, `study_component`.
+Deeper guides via `modx_help`: `graph`, `tv_input_types`, `migx`, `minishop2`, `acl`,
+`study_component`.

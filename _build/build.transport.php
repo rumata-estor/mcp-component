@@ -110,7 +110,29 @@ $menuVehicle = $builder->createVehicle($menu, array(
     xPDOTransport::RELATED_OBJECTS => false,
 ));
 $builder->putVehicle($menuVehicle);
-$modx->log(modX::LOG_LEVEL_INFO, 'Packaged manager menu (Components > modxMCP).');
+
+/* Second screen: the dependency graph needs the full content region, so it gets its own
+   manager action instead of sharing the settings page. */
+$menuGraph = $modx->newObject('modMenu');
+$menuGraph->fromArray(array(
+    'text'        => 'modxmcp_graph',
+    'parent'      => 'modxmcp',
+    'description' => 'modxmcp_graph_desc',
+    'icon'        => '',
+    'menuindex'   => 1,
+    'params'      => '',
+    'handler'     => '',
+    'action'      => 'graph',
+    'namespace'   => PKG_NAMESPACE,
+), '', true, true);
+$menuGraphVehicle = $builder->createVehicle($menuGraph, array(
+    xPDOTransport::PRESERVE_KEYS => true,
+    xPDOTransport::UPDATE_OBJECT => true,
+    xPDOTransport::UNIQUE_KEY    => 'text',
+    xPDOTransport::RELATED_OBJECTS => false,
+));
+$builder->putVehicle($menuGraphVehicle);
+$modx->log(modX::LOG_LEVEL_INFO, 'Packaged manager menus (Components > modxMCP, + Граф связей).');
 
 /* ---- core files ---- */
 $coreVehicle = $builder->createVehicle(

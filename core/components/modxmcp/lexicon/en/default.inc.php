@@ -6,6 +6,9 @@ $_lang['area_modxmcp_logging'] = 'Logging';
 $_lang['area_modxmcp_limits'] = 'Limits';
 $_lang['area_modxmcp_paths'] = 'Paths';
 $_lang['modxmcp_menu_desc'] = 'MCP endpoint status and API token.';
+$_lang['modxmcp_graph'] = 'Dependency graph';
+$_lang['modxmcp_graph_title'] = 'dependency graph';
+$_lang['modxmcp_graph_desc'] = 'How the site is wired: what uses what, broken references, dead code.';
 
 $_lang['modxmcp_cmp_intro'] = 'MCP endpoint for this MODX site. Pair it with the modx-mcp client (set MODX_MCP_SITE_URL + MODX_MCP_TOKEN).';
 $_lang['modxmcp_cmp_endpoint'] = 'Endpoint';
