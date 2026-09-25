@@ -70,7 +70,7 @@ $sources = array(
 );
 
 $builder = new modPackageBuilder($modx);
-$builder->createPackage(PKG_NAMESPACE, PKG_VERSION, PKG_RELEASE);
+$builder->createPackage(PKG_NAME, PKG_VERSION, PKG_RELEASE);
 $builder->registerNamespace(
     PKG_NAMESPACE,
     false,
