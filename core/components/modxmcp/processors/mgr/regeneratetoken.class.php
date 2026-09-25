@@ -1,10 +1,12 @@
 <?php
+
+use MODX\Revolution\Processors\Processor;
 /**
  * Manager processor: generate a fresh modxmcp.api_token and save it.
  * Returns the new token ONCE so the operator can copy it into their client config.
  * Requires the manager "settings" permission.
  */
-class ModxmcpRegenerateTokenProcessor extends modProcessor {
+class ModxmcpRegenerateTokenProcessor extends Processor {
     public function checkPermissions() {
         return $this->modx->hasPermission('settings');
     }
