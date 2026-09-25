@@ -1,4 +1,6 @@
 <?php
+
+use MODX\Revolution\modX;
 if (!class_exists("ModxMCPClientException")) {
     /** Expected/validation error whose message is safe to return to the client. */
     class ModxMCPClientException extends Exception {}
