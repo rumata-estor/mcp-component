@@ -1,4 +1,9 @@
 <?php
+
+use MODX\Revolution\modNamespace;
+use MODX\Revolution\modSystemSetting;
+use MODX\Revolution\modX;
+use MODX\Revolution\Transport\modTransportPackage;
 /**
  * One-off headless installer + verifier for the modxMCP transport package.
  * TEST/DEV ONLY — delete after use. Installs core/packages/<signature>.transport.zip
@@ -17,19 +22,17 @@ if (!$config || !file_exists($config)) {
 }
 if (!$config) { die("config.core.php not found\n"); }
 require_once $config;
-require_once MODX_CORE_PATH . 'model/modx/modx.class.php';
+require_once MODX_CORE_PATH . 'vendor/autoload.php';
 
 $modx = new modX();
 $modx->initialize('mgr');
-$modx->getService('error', 'error.modError');
 header('Content-Type: text/plain; charset=utf-8');
 
 $signature = isset($_GET['sig']) ? preg_replace('/[^a-zA-Z0-9._-]/', '', $_GET['sig']) : 'modxmcp-1.0.0-pl';
 $action = isset($_GET['action']) ? $_GET['action'] : 'install';
-$modx->loadClass('transport.modTransportPackage');
 
 if ($action === 'uninstall') {
-    $pkg = $modx->getObject('transport.modTransportPackage', array('signature' => $signature));
+    $pkg = $modx->getObject(modTransportPackage::class, array('signature' => $signature));
     if (!$pkg) { echo "no package record for $signature\n"; exit; }
     $un = $pkg->uninstall();
     echo 'uninstall(): ' . ($un ? 'OK' : 'FAILED') . "\n";
@@ -39,9 +42,9 @@ if ($action === 'uninstall') {
     exit;
 }
 
-$package = $modx->getObject('transport.modTransportPackage', array('signature' => $signature));
+$package = $modx->getObject(modTransportPackage::class, array('signature' => $signature));
 if (!$package) {
-    $package = $modx->newObject('transport.modTransportPackage');
+    $package = $modx->newObject(modTransportPackage::class);
     $package->set('signature', $signature);
     $package->set('state', 1);
     $package->set('created', date('Y-m-d H:i:s'));
@@ -68,15 +71,15 @@ echo 'install(): ' . ($ok ? 'OK' : 'FAILED') . "\n";
 
 $modx->getCacheManager()->refresh();
 
-$ns = $modx->getObject('modNamespace', array('name' => 'modxmcp'));
+$ns = $modx->getObject(modNamespace::class, array('name' => 'modxmcp'));
 echo 'namespace modxmcp: ' . ($ns ? 'yes' : 'NO') . "\n";
-echo 'modxmcp.* settings: ' . $modx->getCount('modSystemSetting', array('key:LIKE' => 'modxmcp.%')) . "\n";
+echo 'modxmcp.* settings: ' . $modx->getCount(modSystemSetting::class, array('key:LIKE' => 'modxmcp.%')) . "\n";
 
-$token = $modx->getObject('modSystemSetting', array('key' => 'modxmcp.api_token'));
+$token = $modx->getObject(modSystemSetting::class, array('key' => 'modxmcp.api_token'));
 $tv = $token ? (string) $token->get('value') : '';
 echo 'api_token: ' . ($tv !== '' ? ('set, ' . strlen($tv) . ' chars') : 'EMPTY') . "\n";
 
-$en = $modx->getObject('modSystemSetting', array('key' => 'modxmcp.enabled'));
+$en = $modx->getObject(modSystemSetting::class, array('key' => 'modxmcp.enabled'));
 echo 'enabled (default): ' . ($en ? var_export($en->get('value'), true) : '?') . "\n";
 
 echo 'file assets/.../api.php: ' . (file_exists(MODX_ASSETS_PATH . 'components/modxmcp/api.php') ? 'yes' : 'NO') . "\n";
