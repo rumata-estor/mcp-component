@@ -1,5 +1,6 @@
 # MODX 3 fork notes
 
+- Added CLI-only headless install/update (`_build/install.headless.php`) as the recommended MODX 3 deployment path: no Package Manager record and no manager menu are created; files, namespace, settings, token and cache refresh are handled directly.
 The `modx3` branch ports modxMCP 1.9.0 to native MODX Revolution 3 APIs while keeping the MCP action surface compatible.
 
 - Native MODX 3 bootstrap via Composer and `modX::getInstance()`.
