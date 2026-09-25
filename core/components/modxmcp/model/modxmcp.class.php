@@ -502,6 +502,42 @@ class modxMCP {
     }
 
     /**
+     * Normalize legacy MODX 2 model identifiers supplied by callers to MODX 3 FQCNs.
+     * Friendly aliases are handled by the individual action before/after this helper.
+     */
+    private function normalizeCoreModelClass($class) {
+        $class = trim((string) $class);
+        if ($class === '' || strpos($class, 'MODX\\Revolution\\') === 0 || strpos($class, 'xPDO\\') === 0) {
+            return $class;
+        }
+
+        $map = array(
+            'modresource' => \MODX\Revolution\modResource::class,
+            'modchunk' => \MODX\Revolution\modChunk::class,
+            'modsnippet' => \MODX\Revolution\modSnippet::class,
+            'modtemplate' => \MODX\Revolution\modTemplate::class,
+            'modtemplatevar' => \MODX\Revolution\modTemplateVar::class,
+            'modplugin' => \MODX\Revolution\modPlugin::class,
+            'modcategory' => \MODX\Revolution\modCategory::class,
+            'moduser' => \MODX\Revolution\modUser::class,
+            'modusergroup' => \MODX\Revolution\modUserGroup::class,
+            'modcontext' => \MODX\Revolution\modContext::class,
+            'modsystemsetting' => \MODX\Revolution\modSystemSetting::class,
+            'modpropertyset' => \MODX\Revolution\modPropertySet::class,
+            'modelementpropertyset' => \MODX\Revolution\modElementPropertySet::class,
+            'modnamespace' => \MODX\Revolution\modNamespace::class,
+            'sources.modmediasource' => \MODX\Revolution\Sources\modMediaSource::class,
+            'sources.modfilemediasource' => \MODX\Revolution\Sources\modFileMediaSource::class,
+            'sources.modmediasourceelement' => \MODX\Revolution\Sources\modMediaSourceElement::class,
+            'transport.modtransportpackage' => \MODX\Revolution\Transport\modTransportPackage::class,
+            'transport.modtransportprovider' => \MODX\Revolution\Transport\modTransportProvider::class,
+        );
+
+        $key = strtolower($class);
+        return isset($map[$key]) ? $map[$key] : $class;
+    }
+
+    /**
      * Resolve a legacy MODX core processor path to its MODX 3 PSR-4 class.
      * This intentionally avoids MODX 2 deprecated global aliases and legacy
      * processor-path guessing, which may disappear in later MODX 3 releases.
@@ -2363,6 +2399,7 @@ class modxMCP {
             'context' => \MODX\Revolution\modContext::class, 'setting' => \MODX\Revolution\modSystemSetting::class,
         );
         if (isset($alias[strtolower($class)])) { $class = $alias[strtolower($class)]; }
+        $class = $this->normalizeCoreModelClass($class);
         $meta = $this->modx->getFieldMeta($class);
         if (empty($meta)) {
             if (!$this->modx->loadClass($class)) {
@@ -3284,7 +3321,7 @@ class modxMCP {
     // --- Property sets (modPropertySet + modElementPropertySet), direct xPDO ---
 
     private function propertySetElementClass($data) {
-        if (!empty($data['element_class'])) { return (string) $data['element_class']; }
+        if (!empty($data['element_class'])) { return $this->normalizeCoreModelClass($data['element_class']); }
         $map = array('snippet' => \MODX\Revolution\modSnippet::class, 'chunk' => \MODX\Revolution\modChunk::class, 'template' => \MODX\Revolution\modTemplate::class, 'plugin' => \MODX\Revolution\modPlugin::class, 'tv' => \MODX\Revolution\modTemplateVar::class);
         $t = isset($data['element_type']) ? $data['element_type'] : '';
         if (isset($map[$t])) { return $map[$t]; }
