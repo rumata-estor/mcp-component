@@ -1,6 +1,8 @@
 <?php
+
+use MODX\Revolution\modX;
 require_once dirname(dirname(dirname(dirname(__FILE__)))) . '/config.core.php';
-require_once MODX_CORE_PATH . 'model/modx/modx.class.php';
+require_once MODX_CORE_PATH . 'vendor/autoload.php';
 
 if (!class_exists('ModxMCPClientException')) {
     /** Expected/validation error whose message is safe to return to the client. */
@@ -9,7 +11,6 @@ if (!class_exists('ModxMCPClientException')) {
 
 $modx = new modX();
 $modx->initialize('mgr'); 
-$modx->getService('error', 'error.modError');
 $modx->setLogLevel(modX::LOG_LEVEL_ERROR);
 
 header('Content-Type: application/json; charset=utf-8');
