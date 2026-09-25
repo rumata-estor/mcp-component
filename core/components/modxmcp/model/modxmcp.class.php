@@ -7,6 +7,7 @@ if (!class_exists("ModxMCPClientException")) {
 }
 class modxMCP {
     const VERSION = '1.9.0';
+    const VARIANT = 'modx3';
     public $modx;
     public $config =[];
     private $actionSpecsCache = null;
