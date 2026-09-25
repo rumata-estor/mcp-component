@@ -24,7 +24,7 @@ if (!$config) { die("config.core.php not found\n"); }
 require_once $config;
 require_once MODX_CORE_PATH . 'vendor/autoload.php';
 
-$modx = new modX();
+$modx = modX::getInstance();
 $modx->initialize('mgr');
 header('Content-Type: text/plain; charset=utf-8');
 
