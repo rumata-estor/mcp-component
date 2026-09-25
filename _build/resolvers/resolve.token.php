@@ -1,4 +1,9 @@
 <?php
+
+use MODX\Revolution\modSystemSetting;
+use MODX\Revolution\modX;
+use xPDO\Transport\xPDOTransport;
+use xPDO\xPDO;
 /**
  * Resolver: generate a random modxmcp.api_token on install/upgrade if it's empty.
  * Leaves an existing token untouched (so upgrades don't rotate it).
@@ -28,7 +33,7 @@ if (!$modx) {
 
 $action = isset($options[xPDOTransport::PACKAGE_ACTION]) ? $options[xPDOTransport::PACKAGE_ACTION] : '';
 if ($action === xPDOTransport::ACTION_INSTALL || $action === xPDOTransport::ACTION_UPGRADE) {
-    $setting = $modx->getObject('modSystemSetting', array('key' => 'modxmcp.api_token'));
+    $setting = $modx->getObject(modSystemSetting::class, array('key' => 'modxmcp.api_token'));
     if ($setting && trim((string) $setting->get('value')) === '') {
         try {
             $token = bin2hex(random_bytes(32));
