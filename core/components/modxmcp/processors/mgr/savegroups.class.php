@@ -1,9 +1,11 @@
 <?php
+
+use MODX\Revolution\Processors\Processor;
 /**
  * Manager processor: save the modxmcp.disabled_groups setting from the CMP capability toggles.
  * Accepts a CSV `disabled` of group keys; only known toggleable keys are stored.
  */
-class ModxmcpSaveGroupsProcessor extends modProcessor {
+class ModxmcpSaveGroupsProcessor extends Processor {
     public function checkPermissions() {
         return $this->modx->hasPermission('settings');
     }
