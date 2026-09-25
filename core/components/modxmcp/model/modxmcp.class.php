@@ -1080,7 +1080,7 @@ class modxMCP {
                 \MODX\Revolution\modTemplateVar::class => 'tv', \MODX\Revolution\modPlugin::class => 'plugin',
             );
             foreach ($this->modx->getCollection(\MODX\Revolution\modElementPropertySet::class) as $link) {
-                $cls  = (string) $link->get('element_class');
+                $cls  = $this->normalizeCoreModelClass((string) $link->get('element_class'));
                 $pset = (int) $link->get('property_set');
                 if (!isset($classToType[$cls]) || !isset($setRefs[$pset])) { continue; }
                 $t = $classToType[$cls];
