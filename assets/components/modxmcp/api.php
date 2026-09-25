@@ -20,6 +20,11 @@ header('Content-Type: application/json; charset=utf-8');
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $version = 'unknown';
     $corePath = $modx->getOption('modxmcp.core_path', null, $modx->getOption('core_path') . 'components/modxmcp/');
+    $corePath = str_replace(
+        array('{core_path}', '[[++core_path]]'),
+        rtrim((string) $modx->getOption('core_path'), '/\\') . DIRECTORY_SEPARATOR,
+        (string) $corePath
+    );
     $modelFile = $corePath . 'model/modxmcp.class.php';
     if (file_exists($modelFile)) {
         require_once $modelFile;
@@ -144,6 +149,11 @@ if (isset($input['id'])) $data['id'] = $input['id'];
 
 try {
     $corePath = $modx->getOption('modxmcp.core_path', null, $modx->getOption('core_path') . 'components/modxmcp/');
+    $corePath = str_replace(
+        array('{core_path}', '[[++core_path]]'),
+        rtrim((string) $modx->getOption('core_path'), '/\\') . DIRECTORY_SEPARATOR,
+        (string) $corePath
+    );
     require_once $corePath . 'model/modxmcp.class.php';
     
     $mcp = new modxMCP($modx);
@@ -163,6 +173,29 @@ try {
         modX::LOG_LEVEL_ERROR,
         sprintf(
             '[%s] MCP request failed. action=%s type=%s message=%s',
+            $errorId,
+            $action,
+            $type,
+            $e->getMessage()
+        )
+    );
+    http_response_code(500);
+    $debug = (bool)$modx->getOption('modxmcp.debug', null, false);
+    $response = [
+        'success' => false,
+        'error' => 'Internal Server Error',
+        'error_id' => $errorId,
+    ];
+    if ($debug) {
+        $response['details'] = $e->getMessage();
+    }
+    echo json_encode($response, JSON_UNESCAPED_UNICODE);
+} catch (Throwable $e) {
+    $errorId = uniqid('modxmcp_', true);
+    $modx->log(
+        modX::LOG_LEVEL_ERROR,
+        sprintf(
+            '[%s] MCP request failed. action=%s type=%s throwable=%s',
             $errorId,
             $action,
             $type,
