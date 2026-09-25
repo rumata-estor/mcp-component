@@ -141,7 +141,7 @@ class modxMCP {
 
             case 'get_element':
                 if (empty($data['id'])) throw new ModxMCPClientException("{$elementType} not found by name or ID is missing.");
-                $response = $this->modx->runProcessor($basePath . 'get',['id' => $data['id']]);
+                $response = $this->runCoreProcessor($basePath . 'get',['id' => $data['id']]);
                 if ($response->isError()) throw new ModxMCPClientException($this->formatProcessorErrors($response));
                 
                 $objData = $response->getObject();
@@ -159,7 +159,7 @@ class modxMCP {
             case 'update_element':
                 if (empty($data['id'])) throw new ModxMCPClientException("{$elementType} not found by name or ID is missing.");
                 
-                $currentResponse = $this->modx->runProcessor($basePath . 'get',['id' => $data['id']]);
+                $currentResponse = $this->runCoreProcessor($basePath . 'get',['id' => $data['id']]);
                 if ($currentResponse->isError()) throw new ModxMCPClientException($this->formatProcessorErrors($currentResponse));
                 
                 $currentData = $currentResponse->getObject();
@@ -169,7 +169,7 @@ class modxMCP {
                 $updateData = $this->filterProcessorData($elementType, $updateData);
                 
                 return $this->runWithTransaction(function () use ($basePath, $updateData, $elementType, $data) {
-                    $response = $this->modx->runProcessor($basePath . 'update', $updateData);
+                    $response = $this->runCoreProcessor($basePath . 'update', $updateData);
                     if ($response->isError()) throw new ModxMCPClientException("Update failed: " . $this->formatProcessorErrors($response));
                     
                     if ($elementType === 'tv') $this->handleTvRelations($data['id'], $data);
@@ -187,7 +187,7 @@ class modxMCP {
                 $createData = $this->filterProcessorData($elementType, $createData);
 
                 return $this->runWithTransaction(function () use ($basePath, $createData, $elementType, $data) {
-                    $response = $this->modx->runProcessor($basePath . 'create', $createData);
+                    $response = $this->runCoreProcessor($basePath . 'create', $createData);
                     if ($response->isError()) throw new ModxMCPClientException("Create failed: " . $this->formatProcessorErrors($response));
                     
                     $newObj = $response->getObject();
@@ -211,7 +211,7 @@ class modxMCP {
                 }
 
                 $processorAction = ($elementType === 'resource') ? 'delete' : 'remove';
-                $response = $this->modx->runProcessor($basePath . $processorAction, ['id' => $data['id']]);
+                $response = $this->runCoreProcessor($basePath . $processorAction, ['id' => $data['id']]);
                 if ($response->isError()) throw new ModxMCPClientException("Delete failed: " . $this->formatProcessorErrors($response));
                 
                 $this->modx->cacheManager->refresh();
@@ -361,7 +361,7 @@ class modxMCP {
                 'update_user'  => array('proc' => 'security/user/update', 'via' => 'acl'),
                 'delete_user'  => array('proc' => 'security/user/delete', 'via' => 'acl'),
                 'list_user_groups'        => array('proc' => 'security/group/getlist', 'list' => true, 'via' => 'acl'),
-                'get_user_group'          => array('proc' => 'security/group/get', 'via' => 'acl'),
+                'get_user_group'          => 'getUserGroup',
                 'create_user_group'       => array('proc' => 'security/group/create', 'via' => 'acl'),
                 'update_user_group'       => array('proc' => 'security/group/update', 'via' => 'acl'),
                 'delete_user_group'       => array('proc' => 'security/group/remove', 'via' => 'acl'),
@@ -499,6 +499,64 @@ class modxMCP {
             }
         }
         throw new ModxMCPClientException("Unhandled action spec for action '{$action}'.");
+    }
+
+    /**
+     * Resolve a legacy MODX core processor path to its MODX 3 PSR-4 class.
+     * This intentionally avoids MODX 2 deprecated global aliases and legacy
+     * processor-path guessing, which may disappear in later MODX 3 releases.
+     */
+    private function coreProcessorClass($processor) {
+        $processor = ltrim((string) $processor, '\\');
+        if (strpos($processor, 'MODX\\Revolution\\Processors\\') === 0) {
+            return $processor;
+        }
+
+        $path = trim(str_replace('\\', '/', $processor), '/');
+        if ($path === '') {
+            throw new ModxMCPClientException('Empty MODX core processor path.');
+        }
+
+        if (strpos($path, 'workspace/namespace/') === 0) {
+            $path = 'workspace/package_namespace/' . substr($path, strlen('workspace/namespace/'));
+        } elseif (strpos($path, 'element/tv/') === 0) {
+            $path = 'element/template_var/' . substr($path, strlen('element/tv/'));
+        }
+
+        $nameMap = array(
+            'package_namespace' => 'PackageNamespace',
+            'template_var'      => 'TemplateVar',
+            'resourcegroup'     => 'ResourceGroup',
+            'usergroup'         => 'UserGroup',
+            'getlist'           => 'GetList',
+            'getnodes'          => 'GetNodes',
+            'getinfo'           => 'GetInfo',
+            'emptyrecyclebin'   => 'EmptyRecycleBin',
+            'refreshuris'       => 'RefreshUris',
+            'remove_locks'      => 'RemoveLocks',
+            'removeresource'    => 'RemoveResource',
+            'updateresourcesin' => 'UpdateResourcesIn',
+        );
+
+        $parts = explode('/', $path);
+        foreach ($parts as &$part) {
+            $key = strtolower($part);
+            $part = isset($nameMap[$key]) ? $nameMap[$key] : ucfirst($part);
+        }
+        unset($part);
+
+        $class = 'MODX\\Revolution\\Processors\\' . implode('\\', $parts);
+        if (!class_exists($class)) {
+            throw new ModxMCPClientException(
+                "MODX 3 core processor class not found: {$class} (legacy path: {$processor})."
+            );
+        }
+        return $class;
+    }
+
+    /** Run a MODX core processor by its real MODX 3 class name. */
+    private function runCoreProcessor($processor, array $properties = array(), array $options = array()) {
+        return $this->modx->runProcessor($this->coreProcessorClass($processor), $properties, $options);
     }
 
     /** Derive an action => {processor,list} map for one dispatch route ('acl'|'context'|'workspace'). */
@@ -1636,7 +1694,7 @@ class modxMCP {
 
     private function undeleteResource($data) {
         if (empty($data['id'])) { throw new ModxMCPClientException('undelete_resource: "id" is required.'); }
-        $resp = $this->modx->runProcessor('resource/undelete', array('id' => (int) $data['id']));
+        $resp = $this->runCoreProcessor('resource/undelete', array('id' => (int) $data['id']));
         if (!$resp || $resp->isError()) { throw new ModxMCPClientException($resp ? $this->formatProcessorErrors($resp) : 'undelete_resource: no response.'); }
         if ($this->modx->getCacheManager()) { $this->modx->getCacheManager()->refresh(); }
         $this->logAudit('undelete_resource', 'resource', array('id' => (int) $data['id']));
@@ -1644,7 +1702,7 @@ class modxMCP {
     }
 
     private function emptyRecycleBin($data) {
-        $resp = $this->modx->runProcessor('resource/emptyrecyclebin', array());
+        $resp = $this->runCoreProcessor('resource/emptyrecyclebin', array());
         if (!$resp || $resp->isError()) { throw new ModxMCPClientException($resp ? $this->formatProcessorErrors($resp) : 'empty_recycle_bin: no response.'); }
         if ($this->modx->getCacheManager()) { $this->modx->getCacheManager()->refresh(); }
         $this->logAudit('empty_recycle_bin', 'resource', array());
@@ -1657,7 +1715,7 @@ class modxMCP {
         if (!empty($data['name'])) { $props['name'] = (string) $data['name']; }
         if (isset($data['duplicate_children'])) { $props['duplicate_children'] = (bool) $data['duplicate_children']; }
         if (!empty($data['published_mode'])) { $props['published_mode'] = (string) $data['published_mode']; }
-        $resp = $this->modx->runProcessor('resource/duplicate', $props);
+        $resp = $this->runCoreProcessor('resource/duplicate', $props);
         if (!$resp || $resp->isError()) { throw new ModxMCPClientException($resp ? $this->formatProcessorErrors($resp) : 'duplicate_resource: no response.'); }
         if ($this->modx->getCacheManager()) { $this->modx->getCacheManager()->refresh(); }
         $this->logAudit('duplicate_resource', 'resource', array('id' => (int) $data['id']));
@@ -1672,7 +1730,7 @@ class modxMCP {
         if (empty($data['id'])) { throw new ModxMCPClientException('duplicate_element: "id" is required.'); }
         $props = array('id' => (int) $data['id']);
         if (!empty($data['name'])) { $props['name'] = (string) $data['name']; }
-        $resp = $this->modx->runProcessor('element/' . $type . '/duplicate', $props);
+        $resp = $this->runCoreProcessor('element/' . $type . '/duplicate', $props);
         if (!$resp || $resp->isError()) { throw new ModxMCPClientException($resp ? $this->formatProcessorErrors($resp) : 'duplicate_element: no response.'); }
         if ($this->modx->getCacheManager()) { $this->modx->getCacheManager()->refresh(); }
         $this->logAudit('duplicate_element', $type, array('id' => (int) $data['id']));
@@ -1715,7 +1773,7 @@ class modxMCP {
     }
 
     private function refreshUris($data) {
-        $resp = $this->modx->runProcessor('system/refreshuris', array());
+        $resp = $this->runCoreProcessor('system/refreshuris', array());
         if (!$resp || $resp->isError()) { throw new ModxMCPClientException($resp ? $this->formatProcessorErrors($resp) : 'refresh_uris: no response.'); }
         if ($this->modx->getCacheManager()) { $this->modx->getCacheManager()->refresh(); }
         $this->logAudit('refresh_uris', 'system', array());
@@ -1723,7 +1781,7 @@ class modxMCP {
     }
 
     private function removeLocks($data) {
-        $resp = $this->modx->runProcessor('system/remove_locks', array());
+        $resp = $this->runCoreProcessor('system/remove_locks', array());
         if (!$resp || $resp->isError()) { throw new ModxMCPClientException($resp ? $this->formatProcessorErrors($resp) : 'remove_locks: no response.'); }
         $this->logAudit('remove_locks', 'system', array());
         return $this->normalizeProcessorResponse($resp);
@@ -2053,7 +2111,7 @@ class modxMCP {
         $data = $el->toArray();
         $data[$m['field']] = $content;
         $data = $this->filterProcessorData($type, $data);
-        $resp = $this->modx->runProcessor($m['proc'] . 'update', $data);
+        $resp = $this->runCoreProcessor($m['proc'] . 'update', $data);
         if (!$resp || $resp->isError()) {
             throw new ModxMCPClientException('element save failed: ' . ($resp ? $this->formatProcessorErrors($resp) : 'no response.'));
         }
@@ -2364,9 +2422,9 @@ class modxMCP {
                 if (!isset($props['context_key'])) { $props['context_key'] = 'web'; }
                 if (!isset($props['parent'])) { $props['parent'] = 0; }
                 if (!isset($props['published'])) { $props['published'] = 1; }
-                $resp = $this->modx->runProcessor('resource/create', $props);
+                $resp = $this->runCoreProcessor('resource/create', $props);
             } else {
-                $resp = $this->modx->runProcessor('resource/update', $props);
+                $resp = $this->runCoreProcessor('resource/update', $props);
             }
             if (!$resp || $resp->isError()) { throw new ModxMCPClientException($resp ? $this->formatProcessorErrors($resp) : 'ms2 category: no response.'); }
             if ($this->modx->getCacheManager()) { $this->modx->getCacheManager()->refresh(); }
@@ -2691,10 +2749,10 @@ class modxMCP {
         if ($isCreate) {
             if (empty($props['name'])) { throw new ModxMCPClientException('create_media_source: name is required.'); }
             if (empty($props['class_key'])) { $props['class_key'] = \MODX\Revolution\Sources\modFileMediaSource::class; }
-            $resp = $this->modx->runProcessor('source/create', $props);
+            $resp = $this->runCoreProcessor('source/create', $props);
         } else {
             if (empty($props['id'])) { throw new ModxMCPClientException('update_media_source: id is required.'); }
-            $resp = $this->modx->runProcessor('source/update', $props);
+            $resp = $this->runCoreProcessor('source/update', $props);
         }
         if (!$resp) { throw new ModxMCPClientException('media source: no response.'); }
         if ($resp->isError()) { throw new ModxMCPClientException($this->formatProcessorErrors($resp)); }
@@ -2724,7 +2782,7 @@ class modxMCP {
 
     private function deleteMediaSource($data) {
         if (empty($data['id'])) { throw new ModxMCPClientException('delete_media_source: id is required.'); }
-        $resp = $this->modx->runProcessor('source/remove', array('id' => (int) $data['id']));
+        $resp = $this->runCoreProcessor('source/remove', array('id' => (int) $data['id']));
         if (!$resp) { throw new ModxMCPClientException('delete_media_source: no response.'); }
         if ($resp->isError()) { throw new ModxMCPClientException($this->formatProcessorErrors($resp)); }
         if ($this->modx->getCacheManager()) { $this->modx->getCacheManager()->refresh(); }
@@ -2781,7 +2839,7 @@ class modxMCP {
         $isList = !empty($cfg['list']);
         if ($isList && !isset($props['limit'])) { $props['limit'] = 0; }
 
-        $response = $this->modx->runProcessor($cfg['processor'], $props);
+        $response = $this->runCoreProcessor($cfg['processor'], $props);
         if (!$response) { throw new ModxMCPClientException("Context processor not found or returned nothing: {$cfg['processor']}"); }
         if ($response->isError()) { throw new ModxMCPClientException($this->formatProcessorErrors($response)); }
 
@@ -2801,6 +2859,18 @@ class modxMCP {
      * Map of Access-Control actions to the core MODX security processor that backs them.
      * 'list' => true means the processor returns a getlist {total,results} payload.
      */
+    private function getUserGroup($data) {
+        $id = isset($data['id']) ? (int) $data['id'] : 0;
+        if ($id <= 0) {
+            throw new ModxMCPClientException('get_user_group: id is required.');
+        }
+        $group = $this->modx->getObject(\MODX\Revolution\modUserGroup::class, $id);
+        if (!$group) {
+            throw new ModxMCPClientException("User group not found: {$id}.");
+        }
+        return $group->toArray();
+    }
+
     private function aclActionMap() {
         return $this->procMapFor('acl');
     }
@@ -2845,7 +2915,7 @@ class modxMCP {
         $isList = !empty($cfg['list']);
         if ($isList && !isset($props['limit'])) { $props['limit'] = 0; }
 
-        $response = $this->modx->runProcessor($cfg['processor'], $props);
+        $response = $this->runCoreProcessor($cfg['processor'], $props);
         if (!$response) { throw new ModxMCPClientException("ACL processor not found or returned nothing: {$cfg['processor']}"); }
         if ($response->isError()) { throw new ModxMCPClientException($this->formatProcessorErrors($response)); }
 
@@ -3038,7 +3108,7 @@ class modxMCP {
         if (!$providerId) { throw new ModxMCPClientException('install_package: no transport provider is configured.'); }
         $existing = $this->modx->getObject(\MODX\Revolution\Transport\modTransportPackage::class, array('package_name' => $name, 'installed:!=' => null));
         if ($existing) { return array('status' => 'already_installed', 'package' => $name, 'signature' => $existing->get('signature')); }
-        $listResp = $this->modx->runProcessor('workspace/packages/rest/getlist', array('provider' => $providerId, 'query' => $name, 'limit' => 20));
+        $listResp = $this->runCoreProcessor('workspace/packages/rest/getlist', array('provider' => $providerId, 'query' => $name, 'limit' => 20));
         if (!$listResp || $listResp->isError()) { throw new ModxMCPClientException('install_package: provider search failed: ' . ($listResp ? $this->formatProcessorErrors($listResp) : 'no response')); }
         $listData = json_decode($listResp->getResponse(), true);
         $rows = isset($listData['results']) ? $listData['results'] : array();
@@ -3047,11 +3117,11 @@ class modxMCP {
         foreach ($rows as $row) { if (isset($row['name']) && strcasecmp($row['name'], $name) === 0) { $chosen = $row; break; } }
         if (!$chosen) { $chosen = $rows[0]; }
         if (empty($chosen['location']) || empty($chosen['signature'])) { throw new ModxMCPClientException('install_package: provider result is missing location/signature.'); }
-        $dlResp = $this->modx->runProcessor('workspace/packages/rest/download', array('info' => $chosen['location'] . '::' . $chosen['signature'], 'provider' => $providerId));
+        $dlResp = $this->runCoreProcessor('workspace/packages/rest/download', array('info' => $chosen['location'] . '::' . $chosen['signature'], 'provider' => $providerId));
         if (!$dlResp || $dlResp->isError()) { throw new ModxMCPClientException('install_package: download failed: ' . ($dlResp ? $this->formatProcessorErrors($dlResp) : 'no response')); }
         $dlObj = $dlResp->getObject();
         $signature = (is_array($dlObj) && !empty($dlObj['signature'])) ? $dlObj['signature'] : $chosen['signature'];
-        $instResp = $this->modx->runProcessor('workspace/packages/install', array('signature' => $signature));
+        $instResp = $this->runCoreProcessor('workspace/packages/install', array('signature' => $signature));
         if (!$instResp || $instResp->isError()) { throw new ModxMCPClientException('install_package: install failed: ' . ($instResp ? $this->formatProcessorErrors($instResp) : 'no response')); }
         if ($this->modx->getCacheManager()) { $this->modx->getCacheManager()->refresh(); }
         $this->logAudit('install_package', 'system', array('package' => $name, 'signature' => $signature));
@@ -3061,7 +3131,7 @@ class modxMCP {
     private function uninstallPackage($data) {
         $sig = isset($data['signature']) ? (string) $data['signature'] : '';
         if ($sig === '') { throw new ModxMCPClientException('uninstall_package: "signature" is required (e.g. migx-2.13.0-pl).'); }
-        $resp = $this->modx->runProcessor('workspace/packages/uninstall', array('signature' => $sig));
+        $resp = $this->runCoreProcessor('workspace/packages/uninstall', array('signature' => $sig));
         if (!$resp || $resp->isError()) { throw new ModxMCPClientException($resp ? $this->formatProcessorErrors($resp) : 'uninstall_package: no response.'); }
         if ($this->modx->getCacheManager()) { $this->modx->getCacheManager()->refresh(); }
         $this->logAudit('uninstall_package', 'system', array('signature' => $sig));
@@ -3069,7 +3139,7 @@ class modxMCP {
     }
 
     private function listProviders($data) {
-        $resp = $this->modx->runProcessor('workspace/providers/getlist', array('limit' => 0));
+        $resp = $this->runCoreProcessor('workspace/providers/getlist', array('limit' => 0));
         if (!$resp || $resp->isError()) { throw new ModxMCPClientException($resp ? $this->formatProcessorErrors($resp) : 'list_providers: no response.'); }
         $d = json_decode($resp->getResponse(), true);
         return array('total' => isset($d['total']) ? (int) $d['total'] : 0, 'results' => isset($d['results']) ? $d['results'] : array());
@@ -3079,7 +3149,7 @@ class modxMCP {
         $providerId = isset($data['provider']) ? (int) $data['provider'] : $this->defaultProviderId();
         if (!$providerId) { throw new ModxMCPClientException('search_packages: no transport provider configured.'); }
         $params = array('provider' => $providerId, 'query' => isset($data['query']) ? (string) $data['query'] : '', 'limit' => isset($data['limit']) ? (int) $data['limit'] : 20, 'start' => isset($data['start']) ? (int) $data['start'] : 0);
-        $resp = $this->modx->runProcessor('workspace/packages/rest/getlist', $params);
+        $resp = $this->runCoreProcessor('workspace/packages/rest/getlist', $params);
         if (!$resp || $resp->isError()) { throw new ModxMCPClientException($resp ? $this->formatProcessorErrors($resp) : 'search_packages: no response (provider unreachable?).'); }
         $d = json_decode($resp->getResponse(), true);
         return array('provider' => $providerId, 'total' => isset($d['total']) ? (int) $d['total'] : 0, 'results' => isset($d['results']) ? $d['results'] : array());
@@ -3090,10 +3160,10 @@ class modxMCP {
         unset($props['action'], $props['elementType']);
         if ($isCreate) {
             if (empty($props['name']) || empty($props['service_url'])) { throw new ModxMCPClientException('create_provider: name and service_url are required.'); }
-            $resp = $this->modx->runProcessor('workspace/providers/create', $props);
+            $resp = $this->runCoreProcessor('workspace/providers/create', $props);
         } else {
             if (empty($props['id'])) { throw new ModxMCPClientException('update_provider: id is required.'); }
-            $resp = $this->modx->runProcessor('workspace/providers/update', $props);
+            $resp = $this->runCoreProcessor('workspace/providers/update', $props);
         }
         if (!$resp || $resp->isError()) { throw new ModxMCPClientException($resp ? $this->formatProcessorErrors($resp) : 'provider: no response.'); }
         $this->logAudit($isCreate ? 'create_provider' : 'update_provider', 'provider', array_intersect_key($props, array_flip(array('id', 'name', 'service_url'))));
@@ -3102,7 +3172,7 @@ class modxMCP {
 
     private function deleteProvider($data) {
         if (empty($data['id'])) { throw new ModxMCPClientException('delete_provider: id is required.'); }
-        $resp = $this->modx->runProcessor('workspace/providers/remove', array('id' => (int) $data['id']));
+        $resp = $this->runCoreProcessor('workspace/providers/remove', array('id' => (int) $data['id']));
         if (!$resp || $resp->isError()) { throw new ModxMCPClientException($resp ? $this->formatProcessorErrors($resp) : 'delete_provider: no response.'); }
         $this->logAudit('delete_provider', 'provider', array('id' => (int) $data['id']));
         return array('deleted' => true, 'id' => (int) $data['id']);
@@ -3122,7 +3192,7 @@ class modxMCP {
         $this->modx->lexicon->load('core:default', 'core:workspaces');
         $isList = !empty($cfg['list']);
         if ($isList && !isset($props['limit'])) { $props['limit'] = 0; }
-        $response = $this->modx->runProcessor($cfg['processor'], $props);
+        $response = $this->runCoreProcessor($cfg['processor'], $props);
         if (!$response || $response->isError()) { throw new ModxMCPClientException($response ? $this->formatProcessorErrors($response) : "Workspace processor not found: {$cfg['processor']}"); }
         $this->logAudit($action, 'workspace', array_intersect_key($props, array_flip(array('name', 'namespace', 'topic', 'language'))));
         if ($isList) {
