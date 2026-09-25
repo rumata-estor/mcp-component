@@ -33,6 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     echo json_encode([
         'component' => 'modxMCP',
         'version'   => $version,
+        'variant'   => (defined('modxMCP::VARIANT') ? modxMCP::VARIANT : 'unknown'),
         'enabled'   => (bool) $modx->getOption('modxmcp.enabled', null, false),
     ], JSON_UNESCAPED_UNICODE);
     exit;
