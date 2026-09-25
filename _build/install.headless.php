@@ -171,8 +171,8 @@ $siteUrl = rtrim((string) $modx->getOption('site_url'), '/');
 $endpoint = $siteUrl . '/assets/components/modxmcp/api.php';
 
 echo "\nmodxMCP headless install/update complete.\n";
-echo "Package Manager record: none\n";
-echo "Manager menu: none\n";
+echo "Package Manager record created by this installer: no\n";
+echo "Manager menu created by this installer: no\n";
 echo "Core files: {$targetCore}\n";
 echo "Assets files: {$targetAssets}\n";
 echo "Endpoint: {$endpoint}\n";
