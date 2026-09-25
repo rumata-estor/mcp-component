@@ -1,8 +1,14 @@
 <?php
+
+use MODX\Revolution\modMenu;
+use MODX\Revolution\modX;
+use MODX\Revolution\Transport\modPackageBuilder;
+use xPDO\Transport\xPDOFileVehicle;
+use xPDO\Transport\xPDOTransport;
 /**
  * modxMCP — transport package builder.
  *
- * Run on a MODX 2.x install (CLI or web). It locates config.core.php by walking up
+ * Run on a MODX 3.x install (CLI or web). It locates config.core.php by walking up
  * from this file, or use the MODX_CONFIG_CORE env var to point at it explicitly.
  *
  *   CLI:  php _build/build.transport.php
@@ -33,7 +39,7 @@ if (!$config || !file_exists($config)) {
     die("modxMCP build: cannot find config.core.php. Set the MODX_CONFIG_CORE env var to its full path.\n");
 }
 require_once $config;
-require_once MODX_CORE_PATH . 'model/modx/modx.class.php';
+require_once MODX_CORE_PATH . 'vendor/autoload.php';
 
 $modx = new modX();
 $modx->initialize('mgr');
@@ -54,8 +60,6 @@ $modx->setLogLevel(modX::LOG_LEVEL_INFO);
 $modx->setLogTarget((defined('XPDO_CLI_MODE') && XPDO_CLI_MODE) ? 'ECHO' : 'HTML');
 echo ((defined('XPDO_CLI_MODE') && XPDO_CLI_MODE) ? '' : '<pre>');
 $modx->log(modX::LOG_LEVEL_INFO, 'Building modxMCP ' . PKG_VERSION . '-' . PKG_RELEASE . ' ...');
-
-$modx->loadClass('transport.modPackageBuilder', '', false, true);
 
 $sources = array(
     'resolvers'     => $buildDir . 'resolvers/',
@@ -91,7 +95,7 @@ if (is_array($settings) && !empty($settings)) {
 }
 
 /* ---- manager menu (Components > modxMCP) ---- */
-$menu = $modx->newObject('modMenu');
+$menu = $modx->newObject(modMenu::class);
 $menu->fromArray(array(
     'text'        => 'modxmcp',
     'parent'      => 'components',
@@ -113,7 +117,7 @@ $builder->putVehicle($menuVehicle);
 
 /* Second screen: the dependency graph needs the full content region, so it gets its own
    manager action instead of sharing the settings page. */
-$menuGraph = $modx->newObject('modMenu');
+$menuGraph = $modx->newObject(modMenu::class);
 $menuGraph->fromArray(array(
     'text'        => 'modxmcp_graph',
     'parent'      => 'modxmcp',
@@ -140,7 +144,7 @@ $coreVehicle = $builder->createVehicle(
         'source' => $sources['source_core'],
         'target' => "return MODX_CORE_PATH . 'components/';",
     ),
-    array('vehicle_class' => 'xPDOFileVehicle')
+    array('vehicle_class' => xPDOFileVehicle::class)
 );
 $builder->putVehicle($coreVehicle);
 
@@ -150,7 +154,7 @@ $assetsVehicle = $builder->createVehicle(
         'source' => $sources['source_assets'],
         'target' => "return MODX_ASSETS_PATH . 'components/';",
     ),
-    array('vehicle_class' => 'xPDOFileVehicle')
+    array('vehicle_class' => xPDOFileVehicle::class)
 );
 $assetsVehicle->resolve('php', array('source' => $sources['resolvers'] . 'resolve.token.php'));
 $assetsVehicle->resolve('php', array('source' => $sources['resolvers'] . 'resolve.integrations.php'));
