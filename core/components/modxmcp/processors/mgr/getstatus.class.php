@@ -1,8 +1,10 @@
 <?php
+
+use MODX\Revolution\Processors\Processor;
 /**
  * Manager processor: return current modxMCP status for the CMP dashboard.
  */
-class ModxmcpGetStatusProcessor extends modProcessor {
+class ModxmcpGetStatusProcessor extends Processor {
     public function checkPermissions() {
         return $this->modx->hasPermission('settings');
     }
