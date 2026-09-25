@@ -3110,6 +3110,13 @@ class modxMCP {
         $props = (isset($data['properties']) && is_array($data['properties'])) ? $data['properties'] : array();
         $options = array();
         if (!empty($data['processors_path'])) { $options['processors_path'] = (string) $data['processors_path']; }
+
+        // For core processors prefer the explicit MODX 3 PSR-4 class. Custom processor
+        // paths remain untouched when processors_path is provided.
+        if (empty($options['processors_path']) && preg_match('#^(context|element|resource|security|source|system|workspace)/#', $processor)) {
+            $processor = $this->coreProcessorClass($processor);
+        }
+
         $response = $this->modx->runProcessor($processor, $props, $options);
         if (!$response) { throw new ModxMCPClientException('run_processor: no response (processor not found?).'); }
         if ($response->isError()) { throw new ModxMCPClientException($this->formatProcessorErrors($response)); }
