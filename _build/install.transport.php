@@ -28,7 +28,7 @@ $modx = modX::getInstance();
 $modx->initialize('mgr');
 header('Content-Type: text/plain; charset=utf-8');
 
-$signature = isset($_GET['sig']) ? preg_replace('/[^a-zA-Z0-9._-]/', '', $_GET['sig']) : 'modxmcp-1.0.0-pl';
+$signature = isset($_GET['sig']) ? preg_replace('/[^a-zA-Z0-9._-]/', '', $_GET['sig']) : 'modxmcp-1.9.0-modx3';
 $action = isset($_GET['action']) ? $_GET['action'] : 'install';
 
 if ($action === 'uninstall') {
