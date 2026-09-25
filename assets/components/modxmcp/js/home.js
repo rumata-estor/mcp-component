@@ -14,7 +14,7 @@ Ext.onReady(function () {
             btn.disabled = true;
             MODx.Ajax.request({
                 url: cfg.connector_url,
-                params: { action: 'mgr/regeneratetoken' },
+                params: { action: 'mgr/regeneratetoken3' },
                 listeners: {
                     success: {
                         fn: function (r) {
