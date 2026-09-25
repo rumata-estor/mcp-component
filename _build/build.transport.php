@@ -41,7 +41,7 @@ if (!$config || !file_exists($config)) {
 require_once $config;
 require_once MODX_CORE_PATH . 'vendor/autoload.php';
 
-$modx = new modX();
+$modx = modX::getInstance();
 $modx->initialize('mgr');
 
 // When triggered over the web (workspace inside a docroot), require the site's modxMCP token
