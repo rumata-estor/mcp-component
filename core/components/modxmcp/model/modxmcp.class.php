@@ -1723,8 +1723,8 @@ class modxMCP {
         $source = $this->initMediaSource($data);
         $rel = isset($data['path']) ? trim((string) $data['path'], '/') : '';
         if ($rel === '') { throw new ModxMCPClientException('delete_media_folder: "path" is required (refusing to remove the source root).'); }
-        // MODX 2.x removeContainer() takes an ABSOLUTE path (unlike createContainer/removeObject).
-        $path = rtrim($this->getMediaSourceRootPath($source), '/\\') . '/' . $rel;
+        // MODX 3 media sources require paths relative to the source root.
+        $path = $rel;
         $res = $source->removeContainer($path);
         if ($res === false) { throw new ModxMCPClientException('delete_media_folder failed: ' . $this->mediaSourceError($source, 'unknown error')); }
         if ($this->modx->getCacheManager()) { $this->modx->getCacheManager()->refresh(); }
