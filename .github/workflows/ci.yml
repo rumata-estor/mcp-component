@@ -4,6 +4,7 @@ on:
   push:
     branches: [ main, modx3 ]
   pull_request:
+  workflow_dispatch:
 
 jobs:
   lint:
@@ -45,3 +46,17 @@ jobs:
             exit 1
           fi
           echo "CHANGELOG has an entry for ${PKG}."
+
+
+  modx3-processors:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        modx_ref: [v3.2.2-pl, 3.x]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check MODX 3 processor compatibility
+        run: |
+          git clone --depth 1 --branch "${{ matrix.modx_ref }}" https://github.com/modxcms/revolution.git "$RUNNER_TEMP/modx"
+          php _build/test.modx3-processors.php "$RUNNER_TEMP/modx/core/src/Revolution/Processors"
