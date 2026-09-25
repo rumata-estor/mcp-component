@@ -142,6 +142,7 @@ foreach ($settings as $key => $definition) {
 
 $tokenSetting = $modx->getObject(modSystemSetting::class, array('key' => 'modxmcp.api_token'));
 $token = $tokenSetting ? trim((string) $tokenSetting->get('value')) : '';
+$tokenGenerated = false;
 if ($token === '') {
     try {
         $token = bin2hex(random_bytes(32));
@@ -153,6 +154,7 @@ if ($token === '') {
         fwrite(STDERR, "Failed to save generated API token.\n");
         exit(1);
     }
+    $tokenGenerated = true;
 }
 
 $enabled = $modx->getObject(modSystemSetting::class, array('key' => 'modxmcp.enabled'));
@@ -174,5 +176,11 @@ echo "Manager menu: none\n";
 echo "Core files: {$targetCore}\n";
 echo "Assets files: {$targetAssets}\n";
 echo "Endpoint: {$endpoint}\n";
-echo "Token: {$token}\n";
+$showToken = $tokenGenerated || in_array('--show-token', $argv, true);
+if ($showToken) {
+    echo "Token: {$token}\n";
+} else {
+    $preview = strlen($token) > 12 ? substr($token, 0, 6) . '...' . substr($token, -4) : '[set]';
+    echo "Token: {$preview} (use --show-token to print the full value)\n";
+}
 echo "Variant: modx3\n";
