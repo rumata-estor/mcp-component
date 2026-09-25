@@ -2790,7 +2790,7 @@ class modxMCP {
         return array('deleted' => true, 'id' => (int) $data['id']);
     }
 
-    private function regenerateToken() {
+    public function regenerateToken() {
         try {
             $token = bin2hex(random_bytes(32));
         } catch (Exception $e) {
