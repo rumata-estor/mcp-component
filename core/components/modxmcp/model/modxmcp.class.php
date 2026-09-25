@@ -23,6 +23,11 @@ class modxMCP {
     public function __construct(modX &$modx, array $config =[]) {
         $this->modx =& $modx;
         $corePath = $this->modx->getOption('modxmcp.core_path', $config, $this->modx->getOption('core_path') . 'components/modxmcp/');
+        $corePath = str_replace(
+            array('{core_path}', '[[++core_path]]'),
+            rtrim((string) $this->modx->getOption('core_path'), '/\\') . DIRECTORY_SEPARATOR,
+            (string) $corePath
+        );
         $this->config = array_merge(['corePath' => $corePath], $config);
     }
 
