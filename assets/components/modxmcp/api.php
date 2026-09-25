@@ -9,7 +9,7 @@ if (!class_exists('ModxMCPClientException')) {
     class ModxMCPClientException extends Exception {}
 }
 
-$modx = new modX();
+$modx = modX::getInstance();
 $modx->initialize('mgr'); 
 $modx->setLogLevel(modX::LOG_LEVEL_ERROR);
 
