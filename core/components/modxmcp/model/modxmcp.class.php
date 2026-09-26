@@ -1,5 +1,3 @@
-[Reading 5342 lines from start (total: 5342 lines, 0 remaining)]
-
 <?php
 
 use MODX\Revolution\modX;
@@ -5342,5 +5340,3 @@ class modxMCP {
         return $this->joinMediaSourcePath($roots[$scope], $safeName);
     }
 }
-
-[executed on device: 363801.fornex.cloud (8f5f64bb-f348-43b3-8961-b53f304c8ad7)]
