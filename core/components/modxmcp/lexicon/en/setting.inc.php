@@ -6,7 +6,7 @@ $_lang['setting_modxmcp.api_token'] = 'MODX MCP API token';
 $_lang['setting_modxmcp.api_token_desc'] = 'Secret token passed in the X-MCP-Token header to authorize all requests to the MCP API.';
 
 $_lang['setting_modxmcp.service_user_id'] = 'Service user ID';
-$_lang['setting_modxmcp.service_user_id_desc'] = 'The MODX user ID under which MCP executes processors and administrative actions. The user must exist and be active.';
+$_lang['setting_modxmcp.service_user_id_desc'] = 'The MODX user ID under which MCP executes processors and administrative actions. The user must exist, be active and have sudo=1.';
 
 $_lang['setting_modxmcp.debug'] = 'MCP debug mode';
 $_lang['setting_modxmcp.debug_desc'] = 'When enabled, the API returns internal error details in the response. It is recommended to keep this disabled in production.';
