@@ -47,6 +47,7 @@ php _build/install.headless.php
 В ветке `modx3` проверены и исправлены несколько несовместимостей MODX 2 → MODX 3:
 
 - type hints для `modSystemSetting`, `xPDOObject` и `xPDOQuery` переведены на MODX 3 / xPDO 3 namespaces;
+- системные настройки MODX 3 адресуются по реальному ключу `key`; фиктивный числовой `id` удалён из get/update/delete схем;
 - `update_resource_tvs` проверяет результат `setTVValue()` и возвращает ошибку, если значение TV не удалось сохранить;
 - добавлен `modx_list_tv_values` — показывает все явно сохранённые значения конкретного TV, включая возможные старые значения после смены шаблона ресурса;
 - добавлен `modx_clear_tv_values` — без `confirm=true` работает только как preview, с подтверждением очищает сохранённые значения TV;
