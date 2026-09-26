@@ -51,6 +51,9 @@ class modxMCP {
             if (!$user->get('active')) {
                 throw new ModxMCPClientException("Service user is inactive: {$configuredId}.");
             }
+            if (!$user->get('sudo')) {
+                throw new ModxMCPClientException("Service user is not sudo: {$configuredId}.");
+            }
             return $user;
         }
 
