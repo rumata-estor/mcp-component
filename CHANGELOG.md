@@ -22,6 +22,7 @@
 - Endpoint hardening: HTTPS enforcement выполняется до health GET; `Content-Length` проверяется до чтения request body, фактический размер — после чтения; transaction helper откатывает на любом `Throwable`.
 - `service_user_id=0` выбирает только active+sudo пользователя; явно заданный service user также обязан уже быть active+sudo.
 - Добавлены серверные `list_tv_values` / `clear_tv_values` для безопасной работы с явно сохранёнными TV values; destructive clear требует confirm и клиент делает safety backup.
+- Добавлен `_build/release.smoke.sh` + `_build/smoke.endpoint.php`: автоматический PHP lint → build → install → endpoint/CRUD smoke → settings-preservation reinstall → clean uninstall → final install/read-only smoke без вывода API token.
 
 ## История исходной функциональности modxMCP
 
