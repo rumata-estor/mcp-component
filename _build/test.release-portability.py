@@ -25,6 +25,9 @@ required_files = [
     "_build/resolvers/resolve.token.php",
     "_build/resolvers/resolve.settings.php",
     "_build/install.headless.php",
+    "_build/install.transport.php",
+    "_build/smoke.endpoint.php",
+    "_build/release.smoke.sh",
     "client/index.js",
 ]
 for rel in required_files:
@@ -203,9 +206,39 @@ for needle, message in {
     "getObject(modMenu::class": "transport verifier: leftover menu check missing",
     "getObject(modNamespace::class": "transport verifier: leftover namespace check missing",
     "components' . DIRECTORY_SEPARATOR . 'modxmcp": "transport verifier: leftover component-directory check missing",
+    "$expectedSettings = 16": "transport verifier: exact 16-setting install check missing",
+    "$rootMenu": "transport verifier: root menu install check missing",
+    "$graphMenu": "transport verifier: graph menu install check missing",
     "exit(7)": "transport verifier: leftover artifacts must fail the uninstall test",
 }.items():
     if needle not in transport_installer:
+        fail(message)
+
+endpoint_smoke = (ROOT / "_build/smoke.endpoint.php").read_text()
+for needle, message in {
+    "PHP_SAPI !== 'cli'": "endpoint smoke must be CLI-only",
+    "--settings-hash": "endpoint smoke settings-hash mode missing",
+    "--read-only": "endpoint smoke read-only mode missing",
+    "MCP_ENDPOINT_SMOKE_OK": "endpoint CRUD smoke success marker missing",
+    "MCP_ENDPOINT_READ_ONLY_SMOKE_OK": "endpoint read-only smoke marker missing",
+    "finally": "endpoint smoke must guarantee CRUD cleanup",
+    "actionCount !== 182": "endpoint smoke must detect client/server action skew",
+}.items():
+    if needle not in endpoint_smoke:
+        fail(message)
+if "TOKEN=" in endpoint_smoke or "echo $token" in endpoint_smoke:
+    fail("endpoint smoke must never print the API token")
+
+release_smoke = (ROOT / "_build/release.smoke.sh").read_text()
+for needle, message in {
+    "php-lint": "release smoke PHP lint stage missing",
+    "build.transport.php": "release smoke transport build stage missing",
+    "REINSTALL_SETTINGS_PRESERVED_OK": "release smoke settings preservation check missing",
+    "--action=uninstall": "release smoke clean uninstall stage missing",
+    "--read-only": "release smoke final read-only verification missing",
+    "RELEASE_SMOKE_OK": "release smoke success marker missing",
+}.items():
+    if needle not in release_smoke:
         fail(message)
 
 builder = (ROOT / "_build/build.transport.php").read_text()
