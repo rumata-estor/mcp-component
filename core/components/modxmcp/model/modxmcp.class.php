@@ -75,9 +75,6 @@ class modxMCP {
     public function processRequest($action, $elementType, $data =[]) {
         $serviceUser = $this->resolveServiceUser();
         $this->modx->user = $serviceUser;
-        // Preserve historical behavior for an explicitly configured service user.
-        // In automatic mode resolveServiceUser() only selects an already-sudo account.
-        $this->modx->user->set('sudo', 1);
 
         $this->assertCapabilityEnabled($action);
 
