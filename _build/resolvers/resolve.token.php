@@ -48,7 +48,7 @@ if ($action === xPDOTransport::ACTION_INSTALL || $action === xPDOTransport::ACTI
         $setting->save();
         $modx->log(
             modX::LOG_LEVEL_INFO,
-            '[MODX3 MCP] Generated modxmcp.api_token. The component is enabled; copy the token from System Settings (modxmcp) or Components > MODX3 MCP into your MCP client.'
+            '[modxMCP] Generated modxmcp.api_token. The component is enabled; copy the token from System Settings (modxmcp) or Components > modxMCP into your MCP client.'
         );
     }
     if ($modx->getCacheManager()) {
