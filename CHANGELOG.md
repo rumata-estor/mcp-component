@@ -15,7 +15,7 @@
 - Добавлены автоматические portability и client/server contract tests; processor compatibility проверяется на MODX 3.2.2-pl, 3.2.4-pl и ветке 3.x.
 - Headless installer теперь создаёт/обновляет Manager menu, сохраняя существующие настройки и token.
 - Install paths ограничены MODX Revolution `>=3.0.0,<4.0.0`: transport package через `requires`, headless installer через explicit version preflight.
-- Headless deployment переведён на staged core/assets trees с directory swap и rollback предыдущих trees при ошибке; runtime audit log сохраняется между обновлениями.
+- Headless deployment переведён на staged core/assets trees с directory swap и rollback предыдущих trees при ошибке; runtime audit log сохраняется между обновлениями. Namespace/menu/settings/token writes выполняются в общей xPDO transaction и откатываются вместе с файлами при незавершённой установке.
 - Transport uninstall удаляет оба Manager menu, `modxmcp.*` settings, namespace и component files; CLI release verifier проверяет отсутствие leftovers перед удалением package record.
 - Transport/headless parity test сравнивает все 16 `modxmcp.*` definitions целиком: default value, xtype и area.
 - Transport builder переведён в CLI-only режим; API token больше не принимается через query string, чтобы исключить утечку секрета через URL/access logs/browser history.
