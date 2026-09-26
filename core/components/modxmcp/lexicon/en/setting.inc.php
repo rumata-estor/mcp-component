@@ -17,6 +17,21 @@ $_lang['setting_modxmcp.audit_log_desc'] = 'When enabled, create/update/delete o
 $_lang['setting_modxmcp.max_payload_bytes'] = 'Maximum payload size';
 $_lang['setting_modxmcp.max_payload_bytes_desc'] = 'Maximum allowed size of the JSON request body in bytes. Protects the component from oversized or malformed requests.';
 
+$_lang['setting_modxmcp.max_read_bytes'] = 'Maximum read size';
+$_lang['setting_modxmcp.max_read_bytes_desc'] = 'Maximum number of bytes MCP may return when reading a single file.';
+
+$_lang['setting_modxmcp.require_https'] = 'Require HTTPS';
+$_lang['setting_modxmcp.require_https_desc'] = 'When enabled, MCP API POST requests are accepted only over HTTPS. Behind a reverse proxy, X-Forwarded-Proto is honored only from addresses in modxmcp.trusted_proxy_ips.';
+
+$_lang['setting_modxmcp.allowed_ips'] = 'Allowed IP addresses';
+$_lang['setting_modxmcp.allowed_ips_desc'] = 'Optional CSV list of exact IPv4/IPv6 addresses and CIDR ranges allowed to access the MCP API. Empty means no IP restriction.';
+
+$_lang['setting_modxmcp.trusted_proxy_ips'] = 'Trusted reverse proxy IPs';
+$_lang['setting_modxmcp.trusted_proxy_ips_desc'] = 'CSV list of trusted reverse proxy IP/CIDR ranges. X-Forwarded-Proto is honored only from these addresses when enforcing HTTPS. Leave empty when no reverse proxy is used.';
+
+$_lang['setting_modxmcp.disabled_groups'] = 'Disabled capability groups';
+$_lang['setting_modxmcp.disabled_groups_desc'] = 'CSV list of MCP action groups that are hidden from the client and rejected by the server.';
+
 $_lang['setting_modxmcp.allow_root_filesystem_read'] = 'Allow root Filesystem read';
 $_lang['setting_modxmcp.allow_root_filesystem_read_desc'] = 'When enabled, MCP may browse and read files through the root Filesystem media source. Keep disabled if you only want safe component-code inspection.';
 
