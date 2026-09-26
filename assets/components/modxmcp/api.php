@@ -54,7 +54,8 @@ if (!$isEnabled) {
 }
 
 // HTTPS enforcement. New installations enable it by default.
-// X-Forwarded-Proto is trusted only with an explicit opt-in for a trusted reverse proxy.
+// X-Forwarded-Proto is NOT trusted unless modxmcp.trust_proxy_https is explicitly enabled;
+// otherwise a direct client could spoof that header.
 if ((bool) $modx->getOption('modxmcp.require_https', null, true)) {
     $directHttps = (!empty($_SERVER['HTTPS']) && strtolower($_SERVER['HTTPS']) !== 'off')
         || (isset($_SERVER['SERVER_PORT']) && (int) $_SERVER['SERVER_PORT'] === 443);
