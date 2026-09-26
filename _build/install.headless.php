@@ -62,6 +62,32 @@ if (!is_dir($sourceCore) || !is_dir($sourceAssets)) {
     exit(2);
 }
 
+$removeTree = static function ($path) use (&$removeTree) {
+    if (is_link($path) || is_file($path)) {
+        if (!unlink($path)) {
+            throw new RuntimeException("Cannot remove file: {$path}");
+        }
+        return;
+    }
+    if (!is_dir($path)) {
+        return;
+    }
+
+    $items = scandir($path);
+    if ($items === false) {
+        throw new RuntimeException("Cannot read directory for cleanup: {$path}");
+    }
+    foreach ($items as $item) {
+        if ($item === '.' || $item === '..') {
+            continue;
+        }
+        $removeTree($path . DIRECTORY_SEPARATOR . $item);
+    }
+    if (!rmdir($path)) {
+        throw new RuntimeException("Cannot remove directory: {$path}");
+    }
+};
+
 $copyTree = static function ($source, $target) use (&$copyTree) {
     if (!is_dir($target) && !mkdir($target, 0775, true) && !is_dir($target)) {
         throw new RuntimeException("Cannot create directory: {$target}");
@@ -89,9 +115,127 @@ $copyTree = static function ($source, $target) use (&$copyTree) {
     }
 };
 
+// Prepare complete replacement trees first, then swap them into place. This avoids
+// leaving a half-copied component if a copy fails. Previous trees remain available
+// until the whole installer has completed successfully.
 try {
-    $copyTree($sourceCore, $targetCore);
-    $copyTree($sourceAssets, $targetAssets);
+    $deployId = getmypid() . '-' . bin2hex(random_bytes(6));
+} catch (Throwable $e) {
+    fwrite(STDERR, "Cannot create a secure deployment id: " . $e->getMessage() . "\n");
+    exit(1);
+}
+
+$coreParent = dirname($targetCore);
+$assetsParent = dirname($targetAssets);
+$stageCore = $coreParent . DIRECTORY_SEPARATOR . '.modxmcp-stage-' . $deployId;
+$stageAssets = $assetsParent . DIRECTORY_SEPARATOR . '.modxmcp-stage-' . $deployId;
+$backupCore = $coreParent . DIRECTORY_SEPARATOR . '.modxmcp-previous-' . $deployId;
+$backupAssets = $assetsParent . DIRECTORY_SEPARATOR . '.modxmcp-previous-' . $deployId;
+
+$hadCore = file_exists($targetCore) || is_link($targetCore);
+$hadAssets = file_exists($targetAssets) || is_link($targetAssets);
+$coreTouched = false;
+$assetsTouched = false;
+$deployCommitted = false;
+
+$pathExists = static function ($path) {
+    return file_exists($path) || is_link($path);
+};
+
+$restoreTree = static function ($target, $backup, $hadOriginal) use ($removeTree, $pathExists) {
+    try {
+        if ($pathExists($target)) {
+            $removeTree($target);
+        }
+        if ($hadOriginal && $pathExists($backup)) {
+            if (!rename($backup, $target)) {
+                throw new RuntimeException("Cannot restore {$backup} -> {$target}");
+            }
+        }
+    } catch (Throwable $rollbackError) {
+        fwrite(STDERR, "HEADLESS ROLLBACK FAILED: " . $rollbackError->getMessage() . "\n");
+    }
+};
+
+register_shutdown_function(static function () use (
+    &$deployCommitted,
+    &$coreTouched,
+    &$assetsTouched,
+    $targetCore,
+    $targetAssets,
+    $backupCore,
+    $backupAssets,
+    $stageCore,
+    $stageAssets,
+    $hadCore,
+    $hadAssets,
+    $restoreTree,
+    $removeTree,
+    $pathExists
+) {
+    if ($deployCommitted) {
+        return;
+    }
+
+    // Restore assets first, then core, reversing the deployment order.
+    if ($assetsTouched) {
+        $restoreTree($targetAssets, $backupAssets, $hadAssets);
+    }
+    if ($coreTouched) {
+        $restoreTree($targetCore, $backupCore, $hadCore);
+    }
+
+    foreach (array($stageCore, $stageAssets) as $stage) {
+        if ($pathExists($stage)) {
+            try {
+                $removeTree($stage);
+            } catch (Throwable $cleanupError) {
+                fwrite(STDERR, "HEADLESS STAGING CLEANUP FAILED: " . $cleanupError->getMessage() . "\n");
+            }
+        }
+    }
+});
+
+try {
+    foreach (array($stageCore, $stageAssets, $backupCore, $backupAssets) as $transient) {
+        if ($pathExists($transient)) {
+            throw new RuntimeException("Transient deployment path already exists: {$transient}");
+        }
+    }
+    if (is_link($targetCore) || is_link($targetAssets)) {
+        throw new RuntimeException('Refusing to deploy into a symlinked component directory.');
+    }
+
+    $copyTree($sourceCore, $stageCore);
+    $copyTree($sourceAssets, $stageAssets);
+
+    // Preserve the runtime audit log across headless updates.
+    $runtimeLogs = $targetCore . DIRECTORY_SEPARATOR . 'logs';
+    if (is_dir($runtimeLogs)) {
+        $copyTree($runtimeLogs, $stageCore . DIRECTORY_SEPARATOR . 'logs');
+    }
+
+    if ($hadCore) {
+        if (!rename($targetCore, $backupCore)) {
+            throw new RuntimeException("Cannot move current core component to backup.");
+        }
+        $coreTouched = true;
+    }
+    if (!rename($stageCore, $targetCore)) {
+        throw new RuntimeException("Cannot activate staged core component.");
+    }
+    $coreTouched = true;
+
+    if ($hadAssets) {
+        if (!rename($targetAssets, $backupAssets)) {
+            throw new RuntimeException("Cannot move current assets component to backup.");
+        }
+        $assetsTouched = true;
+    }
+    if (!rename($stageAssets, $targetAssets)) {
+        throw new RuntimeException("Cannot activate staged assets component.");
+    }
+    $assetsTouched = true;
 } catch (Throwable $e) {
     fwrite(STDERR, "File deployment failed: " . $e->getMessage() . "\n");
     exit(1);
@@ -188,7 +332,11 @@ foreach ($settings as $key => $definition) {
 }
 
 $tokenSetting = $modx->getObject(modSystemSetting::class, array('key' => 'modxmcp.api_token'));
-$token = $tokenSetting ? trim((string) $tokenSetting->get('value')) : '';
+if (!$tokenSetting) {
+    fwrite(STDERR, "Required system setting modxmcp.api_token is missing after installation.\n");
+    exit(1);
+}
+$token = trim((string) $tokenSetting->get('value'));
 $tokenGenerated = false;
 if ($token === '') {
     try {
@@ -213,6 +361,19 @@ if ($enabled && (string) $enabled->get('value') === '') {
 
 if ($modx->getCacheManager()) {
     $modx->getCacheManager()->refresh();
+}
+
+// Everything after the file swap and MODX object writes succeeded. From this point
+// the shutdown handler must not restore the previous component tree.
+$deployCommitted = true;
+foreach (array($backupCore, $backupAssets, $stageCore, $stageAssets) as $transient) {
+    if ($pathExists($transient)) {
+        try {
+            $removeTree($transient);
+        } catch (Throwable $cleanupError) {
+            fwrite(STDERR, "HEADLESS POST-INSTALL CLEANUP WARNING: " . $cleanupError->getMessage() . "\n");
+        }
+    }
 }
 
 $siteUrl = rtrim((string) $modx->getOption('site_url'), '/');
