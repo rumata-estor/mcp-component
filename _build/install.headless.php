@@ -468,12 +468,13 @@ echo "Endpoint path: {$endpointPath}\n";
 if ($siteUrl !== '') {
     echo "Endpoint from MODX site_url: {$siteUrl}{$endpointPath}\n";
 }
-$showToken = $tokenGenerated || in_array('--show-token', $argv, true);
+$showToken = in_array('--show-token', $argv, true);
 if ($showToken) {
     echo "Token: {$token}\n";
 } else {
     $preview = strlen($token) > 12 ? substr($token, 0, 6) . '...' . substr($token, -4) : '[set]';
-    echo "Token: {$preview} (use --show-token to print the full value)\n";
+    $state = $tokenGenerated ? 'generated' : 'existing';
+    echo "Token: {$preview} ({$state}; use --show-token to print the full value)\n";
 }
 echo "Service user: #{$resolvedServiceUserId}\n";
 echo "Variant: modx3\n";
