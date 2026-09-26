@@ -5063,18 +5063,14 @@ class modxMCP {
     }
 
     private function resolveSystemSetting(array $data) {
-        if (!empty($data['key'])) {
-            return $this->modx->getObject(\MODX\Revolution\modSystemSetting::class, ['key' => $data['key']]);
+        if (empty($data['key'])) {
+            throw new ModxMCPClientException('System setting key is required.');
         }
-        if (!empty($data['id'])) {
-            return $this->modx->getObject(\MODX\Revolution\modSystemSetting::class, ['id' => (int)$data['id']]);
-        }
-        return null;
+        return $this->modx->getObject(\MODX\Revolution\modSystemSetting::class, ['key' => $data['key']]);
     }
 
     private function normalizeSystemSetting(\MODX\Revolution\modSystemSetting $setting) {
         return [
-            'id' => $setting->get('id'),
             'key' => $setting->get('key'),
             'value' => $setting->get('value'),
             'xtype' => $setting->get('xtype'),
