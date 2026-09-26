@@ -2,22 +2,22 @@
 
 ## 1.0.0 (unreleased)
 
-Первый релиз MODX3 MCP на базе оригинального modxMCP.
+Первый релиз новой MODX 3-линейки на базе оригинального modxMCP.
 
+- Новый product/package identity: `MODX3 MCP` / `MODX3MCP` / Node package `modx3-mcp`; внутренний namespace `modxmcp` сохранён.
 - Native MODX Revolution 3 bootstrap, namespaced MODX/xPDO classes и MODX 3 processor routing.
-- Новый product/package identity: `MODX3 MCP` / `MODX3MCP` / Node package `modx3-mcp`; внутренний namespace `modxmcp` сохранён для совместимости.
-- Transport package и CLI/headless installer приведены к переносимой установке без привязки к конкретному серверу.
-- `service_user_id=0` автоматически выбирает первого активного sudo-пользователя; явно заданный ID также обязан быть active + sudo.
+- Transport package и CLI/headless installer приведены к переносимой установке без привязки к конкретному сайту.
+- `service_user_id=0` автоматически выбирает активного sudo-пользователя; жёсткая зависимость от user ID 1 удалена.
 - `auto_static` выключен по умолчанию.
-- HTTPS обязателен по умолчанию; доверие к `X-Forwarded-Proto` включается отдельной настройкой только для доверенного reverse proxy.
-- API token генерируется только через `random_bytes()`; слабые fallback-механизмы удалены.
+- HTTPS обязателен по умолчанию; доверие `X-Forwarded-Proto` вынесено в отдельный explicit opt-in.
+- Удалены слабые fallback-механизмы генерации API token: используется только `random_bytes()` с fail-closed поведением.
 - Manager screens требуют permission `settings`; исправлено разворачивание `{core_path}` в Manager connector.
-- Headless installer создаёт/обновляет те же Manager menu, что transport package.
-- Добавляются автоматические portability и client/server contract tests; processor compatibility проверяется на MODX 3.2.2-pl, 3.2.4-pl и ветке 3.x.
+- Добавлены автоматические portability и client/server contract tests; processor compatibility проверяется на MODX 3.2.2-pl, 3.2.4-pl и ветке 3.x.
+- Headless installer теперь создаёт/обновляет Manager menu, сохраняя существующие настройки и token.
 
 ## История исходной функциональности modxMCP
 
-Ниже сохранена история исходной линии modxMCP, на которой основан MODX3 MCP.
+Ниже сохранена история функциональности исходной линии modxMCP, на которой основан MODX3 MCP.
 
 ## 1.9.0 (2026-08-10)
 
