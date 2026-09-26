@@ -15,6 +15,24 @@ $modx->setLogLevel(modX::LOG_LEVEL_ERROR);
 
 header('Content-Type: application/json; charset=utf-8');
 
+// HTTPS enforcement applies to the entire endpoint, including the unauthenticated health GET.
+// X-Forwarded-Proto is NOT trusted unless modxmcp.trust_proxy_https is explicitly enabled;
+// otherwise a direct client could spoof that header.
+if ((bool) $modx->getOption('modxmcp.require_https', null, true)) {
+    $directHttps = (!empty($_SERVER['HTTPS']) && strtolower($_SERVER['HTTPS']) !== 'off')
+        || (isset($_SERVER['SERVER_PORT']) && (int) $_SERVER['SERVER_PORT'] === 443);
+    $trustProxyHttps = (bool) $modx->getOption('modxmcp.trust_proxy_https', null, false);
+    $forwardedHttps = $trustProxyHttps
+        && isset($_SERVER['HTTP_X_FORWARDED_PROTO'])
+        && strtolower(trim((string) $_SERVER['HTTP_X_FORWARDED_PROTO'])) === 'https';
+    $isHttps = $directHttps || $forwardedHttps;
+    if (!$isHttps) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'error' => 'HTTPS required (modxmcp.require_https).'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+}
+
 // Lightweight unauthenticated health/version probe (GET) for client/server skew detection.
 // Returns only non-sensitive info: component name, server build version, enabled flag.
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
@@ -51,24 +69,6 @@ if (!$isEnabled) {
     http_response_code(403);
     echo json_encode(['success' => false, 'error' => 'modxMCP is disabled.'], JSON_UNESCAPED_UNICODE);
     exit;
-}
-
-// HTTPS enforcement. New installations enable it by default.
-// X-Forwarded-Proto is NOT trusted unless modxmcp.trust_proxy_https is explicitly enabled;
-// otherwise a direct client could spoof that header.
-if ((bool) $modx->getOption('modxmcp.require_https', null, true)) {
-    $directHttps = (!empty($_SERVER['HTTPS']) && strtolower($_SERVER['HTTPS']) !== 'off')
-        || (isset($_SERVER['SERVER_PORT']) && (int) $_SERVER['SERVER_PORT'] === 443);
-    $trustProxyHttps = (bool) $modx->getOption('modxmcp.trust_proxy_https', null, false);
-    $forwardedHttps = $trustProxyHttps
-        && isset($_SERVER['HTTP_X_FORWARDED_PROTO'])
-        && strtolower(trim((string) $_SERVER['HTTP_X_FORWARDED_PROTO'])) === 'https';
-    $isHttps = $directHttps || $forwardedHttps;
-    if (!$isHttps) {
-        http_response_code(403);
-        echo json_encode(['success' => false, 'error' => 'HTTPS required (modxmcp.require_https).'], JSON_UNESCAPED_UNICODE);
-        exit;
-    }
 }
 
 // Optional client-IP allowlist (modxmcp.allowed_ips). Empty = allow all. CSV of exact
