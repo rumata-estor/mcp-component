@@ -151,8 +151,28 @@ if "if (!$user->get('sudo'))" not in model_text:
     fail("model: explicitly configured service user must already be sudo")
 
 settings_resolver = (ROOT / "_build/resolvers/resolve.settings.php").read_text()
-if "ACTION_UNINSTALL" not in settings_resolver or "modSystemSetting::class" not in settings_resolver or "'namespace' => 'modxmcp'" not in settings_resolver:
-    fail("resolve.settings.php: transport uninstall must remove only modxmcp system settings")
+for needle, message in {
+    "ACTION_UNINSTALL": "resolve.settings.php: uninstall action guard missing",
+    "modSystemSetting::class": "resolve.settings.php: modxmcp settings cleanup missing",
+    "'namespace' => 'modxmcp'": "resolve.settings.php: cleanup must be scoped to modxmcp namespace",
+    "modMenu::class": "resolve.settings.php: manager-menu cleanup missing",
+    "'modxmcp_graph', 'modxmcp'": "resolve.settings.php: both manager menus must be cleaned child-first",
+    "modNamespace::class": "resolve.settings.php: namespace cleanup missing",
+}.items():
+    if needle not in settings_resolver:
+        fail(message)
+
+transport_installer = (ROOT / "_build/install.transport.php").read_text()
+for needle, message in {
+    "TRANSPORT_UNINSTALL_VERIFY_OK": "transport verifier: uninstall success marker missing",
+    "getCount(modSystemSetting::class": "transport verifier: leftover settings check missing",
+    "getObject(modMenu::class": "transport verifier: leftover menu check missing",
+    "getObject(modNamespace::class": "transport verifier: leftover namespace check missing",
+    "components' . DIRECTORY_SEPARATOR . 'modxmcp": "transport verifier: leftover component-directory check missing",
+    "exit(7)": "transport verifier: leftover artifacts must fail the uninstall test",
+}.items():
+    if needle not in transport_installer:
+        fail(message)
 
 builder = (ROOT / "_build/build.transport.php").read_text()
 builder_requirements = {
