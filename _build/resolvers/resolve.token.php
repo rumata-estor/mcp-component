@@ -33,19 +33,39 @@ if (!$modx) {
 
 $action = isset($options[xPDOTransport::PACKAGE_ACTION]) ? $options[xPDOTransport::PACKAGE_ACTION] : '';
 if ($action === xPDOTransport::ACTION_INSTALL || $action === xPDOTransport::ACTION_UPGRADE) {
+    $disableApi = static function () use ($modx) {
+        $enabled = $modx->getObject(modSystemSetting::class, array('key' => 'modxmcp.enabled'));
+        if ($enabled) {
+            $enabled->set('value', 0);
+            if (!$enabled->save()) {
+                $modx->log(modX::LOG_LEVEL_ERROR, '[MODX3 MCP] Failed to persist modxmcp.enabled=0 while failing closed.');
+            }
+        }
+    };
+
     $setting = $modx->getObject(modSystemSetting::class, array('key' => 'modxmcp.api_token'));
-    if ($setting && trim((string) $setting->get('value')) === '') {
+    if (!$setting) {
+        $disableApi();
+        $modx->log(modX::LOG_LEVEL_ERROR, '[MODX3 MCP] modxmcp.api_token setting is missing; the API was disabled.');
+        return false;
+    }
+    if (trim((string) $setting->get('value')) === '') {
         try {
             $token = bin2hex(random_bytes(32));
         } catch (Throwable $e) {
-            $modx->log(modX::LOG_LEVEL_ERROR, '[modxMCP] Secure API token generation failed; installation cannot enable the API safely.');
+            $disableApi();
+            $modx->log(modX::LOG_LEVEL_ERROR, '[MODX3 MCP] Secure API token generation failed; the API was disabled.');
             return false;
         }
         $setting->set('value', $token);
-        $setting->save();
+        if (!$setting->save()) {
+            $disableApi();
+            $modx->log(modX::LOG_LEVEL_ERROR, '[MODX3 MCP] Could not save the generated API token; the API was disabled.');
+            return false;
+        }
         $modx->log(
             modX::LOG_LEVEL_INFO,
-            '[modxMCP] Generated modxmcp.api_token. The component is enabled; copy the token from System Settings (modxmcp) or Components > modxMCP into your MCP client.'
+            '[MODX3 MCP] Generated modxmcp.api_token. Copy it from System Settings (modxmcp) or explicitly regenerate it from the CMP if you need a new visible value.'
         );
     }
     if ($modx->getCacheManager()) {
