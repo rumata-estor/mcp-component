@@ -23,6 +23,7 @@ required_files = [
     "_build/build.transport.php",
     "_build/data/transport.settings.php",
     "_build/resolvers/resolve.token.php",
+    "_build/resolvers/resolve.settings.php",
     "_build/install.headless.php",
     "client/index.js",
 ]
@@ -149,6 +150,10 @@ if "['active' => 1, 'sudo' => 1]" not in model_text:
 if "if (!$user->get('sudo'))" not in model_text:
     fail("model: explicitly configured service user must already be sudo")
 
+settings_resolver = (ROOT / "_build/resolvers/resolve.settings.php").read_text()
+if "ACTION_UNINSTALL" not in settings_resolver or "modSystemSetting::class" not in settings_resolver or "'namespace' => 'modxmcp'" not in settings_resolver:
+    fail("resolve.settings.php: transport uninstall must remove only modxmcp system settings")
+
 builder = (ROOT / "_build/build.transport.php").read_text()
 builder_requirements = {
     "registerNamespace(": "transport builder must register namespace",
@@ -156,6 +161,7 @@ builder_requirements = {
     "transport.settings.php": "transport builder must package system settings",
     "resolve.token.php": "transport builder must attach token resolver",
     "resolve.integrations.php": "transport builder must attach integrations resolver",
+    "resolve.settings.php": "transport builder must attach uninstall settings resolver",
     "source_core": "transport builder must package core files",
     "source_assets": "transport builder must package assets files",
     "UPDATE_OBJECT => false": "transport settings must preserve admin-edited values on upgrade",
