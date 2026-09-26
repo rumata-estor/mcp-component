@@ -29,7 +29,7 @@ $defs = array(
     array('modxmcp.max_read_bytes', 262144, 'textfield', 'modxmcp:limits'),
     array('modxmcp.allow_root_filesystem_read', 0, 'combo-boolean', 'modxmcp:security'),
     array('modxmcp.require_https', 1, 'combo-boolean', 'modxmcp:security'),
-    array('modxmcp.allowed_ips', '', 'textfield', 'modxmcp:security'),
+    array('modxmcp.allowed_ips', '', 'textfield', 'modxmcp:security'),\n    array('modxmcp.trusted_proxy_ips', '', 'textfield', 'modxmcp:security'),
     array('modxmcp.component_code_roots', 'core/components,assets/components', 'textfield', 'modxmcp:security'),
     array('modxmcp.core_path', '{core_path}components/modxmcp/', 'textfield', 'modxmcp:paths'),
 );
