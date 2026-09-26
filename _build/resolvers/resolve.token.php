@@ -34,7 +34,11 @@ if (!$modx) {
 $action = isset($options[xPDOTransport::PACKAGE_ACTION]) ? $options[xPDOTransport::PACKAGE_ACTION] : '';
 if ($action === xPDOTransport::ACTION_INSTALL || $action === xPDOTransport::ACTION_UPGRADE) {
     $setting = $modx->getObject(modSystemSetting::class, array('key' => 'modxmcp.api_token'));
-    if ($setting && trim((string) $setting->get('value')) === '') {
+    if (!$setting) {
+        $modx->log(modX::LOG_LEVEL_ERROR, '[modxMCP] Required system setting modxmcp.api_token was not created.');
+        return false;
+    }
+    if (trim((string) $setting->get('value')) === '') {
         try {
             $token = bin2hex(random_bytes(32));
         } catch (Throwable $e) {
@@ -45,7 +49,10 @@ if ($action === xPDOTransport::ACTION_INSTALL || $action === xPDOTransport::ACTI
             return false;
         }
         $setting->set('value', $token);
-        $setting->save();
+        if (!$setting->save()) {
+            $modx->log(modX::LOG_LEVEL_ERROR, '[modxMCP] Could not save generated modxmcp.api_token.');
+            return false;
+        }
         $modx->log(
             modX::LOG_LEVEL_INFO,
             '[modxMCP] Generated modxmcp.api_token. The component is enabled; copy the token from System Settings (modxmcp) or Components > modxMCP into your MCP client.'
