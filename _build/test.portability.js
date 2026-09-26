@@ -15,6 +15,12 @@ const transport = read('_build/data/transport.settings.php');
 const headless = read('_build/install.headless.php');
 const model = read('core/components/modxmcp/model/modxmcp.class.php');
 const api = read('assets/components/modxmcp/api.php');
+const managerController = read('core/components/modxmcp/controllers/index.class.php');
+const managerTemplate = read('core/components/modxmcp/templates/home.tpl');
+const builder = read('_build/build.transport.php');
+const transportInstaller = read('_build/install.transport.php');
+const tokenResolver = read('_build/resolvers/resolve.token.php');
+const serviceUserResolver = read('_build/resolvers/resolve.service_user.php');
 const ru = read('core/components/modxmcp/lexicon/ru/setting.inc.php');
 const en = read('core/components/modxmcp/lexicon/en/setting.inc.php');
 
@@ -83,6 +89,46 @@ if (!api.includes('modxmcp.trusted_proxy_ips')) {
 }
 if (/HTTP_X_FORWARDED_FOR/.test(api)) {
   fail('endpoint must not trust X-Forwarded-For for client authorization');
+}
+
+if (!/PHP_SAPI\s*!==\s*['"]cli['"]/.test(builder)) {
+  fail('transport package builder must remain CLI-only');
+}
+if (/\$_GET|\$_POST|QUERY_STRING/.test(builder)) {
+  fail('transport package builder must not expose a web-triggered build path');
+}
+if (!/DOCUMENT_ROOT/.test(builder) || !/dirname\(\$config\)/.test(builder)) {
+  fail('transport package builder must provide a CLI DOCUMENT_ROOT fallback for config.core.php');
+}
+if (!/PHP_SAPI\s*!==\s*['"]cli['"]/.test(transportInstaller)) {
+  fail('transport test installer must remain CLI-only');
+}
+if (/\$_GET|\$_POST/.test(transportInstaller)) {
+  fail('transport test installer must not accept web request parameters');
+}
+if (!/--show-token/.test(headless) || !/--show-token/.test(transportInstaller)) {
+  fail('full token output must require explicit --show-token in release helpers');
+}
+if ((builder.match(/['"]permissions['"]\s*=>\s*['"]settings['"]/g) || []).length < 2) {
+  fail('both transport manager menu entries must require the settings permission');
+}
+if ((headless.match(/['"]permissions['"]\s*=>\s*['"]settings['"]/g) || []).length < 2) {
+  fail('both headless manager menu entries must require the settings permission');
+}
+if (/\$showToken\s*=\s*\$tokenGenerated/.test(headless)) {
+  fail('headless installer must not print a newly generated full token implicitly');
+}
+if (!/modxmcp\.enabled/.test(tokenResolver) || !/set\(['"]value['"]\s*,\s*0\)/.test(tokenResolver)) {
+  fail('token resolver must fail closed by disabling the API when token setup fails');
+}
+if (!/modxmcp\.enabled/.test(serviceUserResolver) || !/set\(['"]value['"]\s*,\s*0\)/.test(serviceUserResolver)) {
+  fail('service-user resolver must fail closed when no safe service user exists');
+}
+if (/token_full/.test(managerController) || /token_full/.test(managerTemplate)) {
+  fail('manager dashboard must never expose the full MCP API token');
+}
+if (!/hasPermission\(['"]settings['"]\)/.test(managerController)) {
+  fail('manager dashboard token actions must be gated by the settings permission');
 }
 
 const forbidden = [
