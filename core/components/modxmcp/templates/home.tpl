@@ -5,11 +5,12 @@
     <table class="modxmcp-status" cellpadding="6" style="border-collapse:collapse;width:100%;margin:14px 0;">
         <tr><td style="width:240px;color:#888;">{$l.endpoint}</td><td><code>{$endpoint}</code></td></tr>
         <tr><td style="color:#888;">{$l.enabled}</td><td>{if $enabled}<span style="color:#2e7d32;font-weight:bold;">{$l.yes}</span>{else}<span style="color:#c62828;font-weight:bold;">{$l.no}</span> &mdash; {$l.enable_hint}{/if}</td></tr>
-        <tr><td style="color:#888;">{$l.token}</td><td>{if $token_set}<code style="user-select:all;background:#f6f8fa;padding:2px 6px;border-radius:4px;">{$token_full}</code>{else}<span style="color:#c62828;">{$l.token_notset}</span>{/if}</td></tr>
+        <tr><td style="color:#888;">{$l.token}</td><td>{if $token_set}<code style="background:#f6f8fa;padding:2px 6px;border-radius:4px;">{$token_preview}</code>{else}<span style="color:#c62828;">{$l.token_notset}</span>{/if}</td></tr>
         <tr><td style="color:#888;">{$l.auto_static} (<code>modxmcp.auto_static</code>)</td><td>{if $auto_static}{$l.on}{else}{$l.off}{/if}</td></tr>
         <tr><td style="color:#888;">{$l.audit_log} (<code>modxmcp.audit_log</code>)</td><td>{if $audit_log}{$l.on}{else}{$l.off}{/if}</td></tr>
     </table>
 
+    {if $can_manage_token}
     <p>
         <button id="modxmcp-regenerate" class="x-btn" style="padding:8px 16px;cursor:pointer;">{$l.regenerate}</button>
     </p>
@@ -17,6 +18,7 @@
         <strong>{$l.new_token}</strong>
         <pre id="modxmcp-token-value" style="white-space:pre-wrap;word-break:break-all;margin:6px 0 0;"></pre>
     </div>
+    {/if}
 
     <div style="margin:18px 0;padding:14px 16px;border:1px solid #dfe3e8;border-radius:6px;background:#fbfcfd;">
         <div style="font-weight:bold;margin-bottom:3px;">Граф связей</div>
