@@ -180,6 +180,19 @@ if "'modxmcp'" not in builder or "'modxmcp_graph'" not in builder:
 headless_text = (ROOT / "_build/install.headless.php").read_text()
 if "getVersionData()" not in headless_text or "version_compare($fullVersion, '3.0.0', '<')" not in headless_text or "version_compare($fullVersion, '4.0.0', '>=')" not in headless_text:
     fail("headless installer: explicit MODX 3.x preflight guard missing")
+for needle, message in {
+    "register_shutdown_function": "headless installer: rollback shutdown handler missing",
+    ".modxmcp-stage-": "headless installer: staged deployment missing",
+    ".modxmcp-previous-": "headless installer: previous-tree backup missing",
+    "rename($stageCore, $targetCore)": "headless installer: atomic core swap missing",
+    "rename($stageAssets, $targetAssets)": "headless installer: atomic assets swap missing",
+    "$deployCommitted = true": "headless installer: successful deployment commit marker missing",
+    "$copyTree($runtimeLogs, $stageCore . DIRECTORY_SEPARATOR . 'logs')": "headless installer: runtime audit logs must survive update",
+}.items():
+    if needle not in headless_text:
+        fail(message)
+if "Refusing to deploy into a symlinked component directory" not in headless_text:
+    fail("headless installer: component target symlink guard missing")
 for menu_key in ["'modxmcp'", "'modxmcp_graph'"]:
     if menu_key not in headless_text:
         fail(f"headless installer: manager menu missing {menu_key}")
