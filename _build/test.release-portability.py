@@ -136,6 +136,19 @@ for path in token_sources:
     if re.search(r"(md5|sha1|uniqid)\s*\(", text, re.I):
         fail(f"{path.relative_to(ROOT)}: weak token fallback primitive found")
 
+token_resolver = (ROOT / "_build/resolvers/resolve.token.php").read_text()
+if "if (!$setting)" not in token_resolver:
+    fail("resolve.token.php: missing fail-closed check for absent api_token setting")
+if "if (!$setting->save())" not in token_resolver:
+    fail("resolve.token.php: missing fail-closed check for api_token save failure")
+
+if "service_user_id', null, 0" not in model_text:
+    fail("model: service_user_id portable default must remain 0")
+if "['active' => 1, 'sudo' => 1]" not in model_text:
+    fail("model: automatic service user selection must require active + sudo")
+if "if (!$user->get('sudo'))" not in model_text:
+    fail("model: explicitly configured service user must already be sudo")
+
 builder = (ROOT / "_build/build.transport.php").read_text()
 builder_requirements = {
     "registerNamespace(": "transport builder must register namespace",
