@@ -37,12 +37,6 @@ if (!$config || !is_file($config)) {
     exit(2);
 }
 
-// Some hosting environments leave DOCUMENT_ROOT empty for CLI processes,
-// while config.core.php derives MODX_CORE_PATH from it.
-if (empty($_SERVER['DOCUMENT_ROOT'])) {
-    $_SERVER['DOCUMENT_ROOT'] = dirname($config);
-}
-
 require_once $config;
 require_once MODX_CORE_PATH . 'vendor/autoload.php';
 
@@ -60,92 +54,6 @@ if (!is_dir($sourceCore) || !is_dir($sourceAssets)) {
     fwrite(STDERR, "Source component directories are missing. Run this script from the modxMCP repository.\n");
     exit(2);
 }
-
-$removeTree = static function ($path) use (&$removeTree) {
-    if (is_dir($path) && !is_link($path)) {
-        $items = scandir($path);
-        if ($items === false) {
-            throw new RuntimeException("Cannot read directory: {$path}");
-        }
-        foreach ($items as $item) {
-            if ($item === '.' || $item === '..') {
-                continue;
-            }
-            $removeTree($path . DIRECTORY_SEPARATOR . $item);
-        }
-        if (!rmdir($path)) {
-            throw new RuntimeException("Cannot remove directory: {$path}");
-        }
-        return;
-    }
-
-    if (file_exists($path) || is_link($path)) {
-        if (!unlink($path)) {
-            throw new RuntimeException("Cannot remove file: {$path}");
-        }
-    }
-};
-
-$isPreservedPath = static function ($relative, array $prefixes) {
-    $relative = trim(str_replace('\\', '/', $relative), '/');
-    foreach ($prefixes as $prefix) {
-        $prefix = trim(str_replace('\\', '/', $prefix), '/');
-        if ($prefix === '') {
-            continue;
-        }
-        if ($relative === $prefix || strpos($relative, $prefix . '/') === 0) {
-            return true;
-        }
-    }
-    return false;
-};
-
-$pruneTree = static function ($sourceRoot, $targetRoot, $relative, array $preservePrefixes) use (&$pruneTree, $removeTree, $isPreservedPath) {
-    if (!is_dir($targetRoot)) {
-        return;
-    }
-
-    $targetDir = $relative === ''
-        ? $targetRoot
-        : $targetRoot . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relative);
-
-    if (!is_dir($targetDir)) {
-        return;
-    }
-
-    $items = scandir($targetDir);
-    if ($items === false) {
-        throw new RuntimeException("Cannot read directory: {$targetDir}");
-    }
-
-    foreach ($items as $item) {
-        if ($item === '.' || $item === '..') {
-            continue;
-        }
-
-        $childRelative = ltrim(($relative === '' ? '' : $relative . '/') . $item, '/');
-        if ($isPreservedPath($childRelative, $preservePrefixes)) {
-            continue;
-        }
-
-        $sourcePath = $sourceRoot . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $childRelative);
-        $targetPath = $targetRoot . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $childRelative);
-
-        if (!file_exists($sourcePath) && !is_link($sourcePath)) {
-            $removeTree($targetPath);
-            continue;
-        }
-
-        if (is_dir($sourcePath) !== is_dir($targetPath)) {
-            $removeTree($targetPath);
-            continue;
-        }
-
-        if (is_dir($targetPath)) {
-            $pruneTree($sourceRoot, $targetRoot, $childRelative, $preservePrefixes);
-        }
-    }
-};
 
 $copyTree = static function ($source, $target) use (&$copyTree) {
     if (!is_dir($target) && !mkdir($target, 0775, true) && !is_dir($target)) {
@@ -175,9 +83,6 @@ $copyTree = static function ($source, $target) use (&$copyTree) {
 };
 
 try {
-    // Keep runtime audit logs, but remove obsolete shipped component files.
-    $pruneTree($sourceCore, $targetCore, '', array('logs'));
-    $pruneTree($sourceAssets, $targetAssets, '', array());
     $copyTree($sourceCore, $targetCore);
     $copyTree($sourceAssets, $targetAssets);
 } catch (Throwable $e) {
@@ -197,6 +102,8 @@ if (!$namespace->save()) {
     exit(1);
 }
 
+// Keep the CLI installation functionally aligned with the transport package:
+// the component and dependency graph must be available in MODX Manager as well.
 $menus = array(
     'modxmcp' => array(
         'parent' => 'components',
@@ -302,17 +209,14 @@ if ($modx->getCacheManager()) {
 }
 
 $siteUrl = rtrim((string) $modx->getOption('site_url'), '/');
-$endpointPath = '/assets/components/modxmcp/api.php';
+$endpoint = $siteUrl . '/assets/components/modxmcp/api.php';
 
-echo "\nMODX3 MCP headless install/update complete.\n";
+echo "\nmodxMCP headless install/update complete.\n";
 echo "Package Manager record created by this installer: no (manual/headless install)\n";
 echo "Manager menu created/updated: yes\n";
 echo "Core files: {$targetCore}\n";
 echo "Assets files: {$targetAssets}\n";
-echo "Endpoint path: {$endpointPath}\n";
-if ($siteUrl !== '') {
-    echo "Endpoint from MODX site_url: {$siteUrl}{$endpointPath}\n";
-}
+echo "Endpoint: {$endpoint}\n";
 $showToken = $tokenGenerated || in_array('--show-token', $argv, true);
 if ($showToken) {
     echo "Token: {$token}\n";
