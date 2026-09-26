@@ -6,16 +6,19 @@ MCP-сервер и компонент для **MODX Revolution 3.x**, осно�
 
 ## Установка на сайт
 
-### Рекомендуемый способ для MODX 3: headless
+### Headless-установка для агентной схемы
 
-modxMCP не обязан быть установлен как пакет MODX. Для нашей схемы основной вариант — скрытая headless-установка:
+MODX3 MCP не обязан быть зарегистрирован в Package Manager. Для управляемой агентной схемы можно использовать CLI-only headless-установку:
 
 - **нет записи в Package Manager**;
 - создаётся пункт «Компоненты → MODX3 MCP» и экран графа связей;
 - файлы размещаются в `core/components/modxmcp/` и `assets/components/modxmcp/`;
 - создаются namespace `modxmcp`, системные настройки `modxmcp.*` и Manager menu;
 - API-токен создаётся автоматически во время установки, если ещё не задан;
-- повторный запуск того же скрипта обновляет файлы и сохраняет существующие значения настроек.
+- installer явно допускает только MODX Revolution `>=3.0.0,<4.0.0`;
+- повторный запуск обновляет файлы и сохраняет существующие значения всех `modxmcp.*` настроек;
+- новые `core/assets` сначала собираются в staging-каталогах и только затем подменяют текущие; при ошибке до завершения installer'а предыдущие component trees восстанавливаются;
+- runtime audit log `core/components/modxmcp/logs` сохраняется при headless update.
 
 Разместить репозиторий на сервере рядом с MODX (либо указать путь к `config.core.php`) и выполнить:
 
@@ -29,7 +32,7 @@ php _build/install.headless.php
 MODX_CONFIG_CORE=/full/path/to/config.core.php php _build/install.headless.php
 ```
 
-После выполнения скрипт выводит endpoint и API token. Установка доступна **только через CLI** и не создаёт веб-инсталлятор.
+При первом запуске скрипт выводит endpoint и сгенерированный API token. При последующих обновлениях полный существующий token скрыт; для явного вывода используйте `--show-token`. Установка доступна **только через CLI** и не создаёт веб-инсталлятор.
 
 Для обновления после новых изменений в ветке `modx3` используется тот же запуск:
 
@@ -40,7 +43,24 @@ php _build/install.headless.php
 
 ### Transport package
 
-Сборка `modx3mcp-*.transport.zip` предназначена для штатной установки через Package Manager MODX и является основным переносимым вариантом для установки на другой сайт.
+Для обычной переносимой установки на другой сайт предназначен штатный MODX transport package. Для версии `1.0.0-pl` его сигнатура — `modx3mcp-1.0.0-pl`, файл — `modx3mcp-1.0.0-pl.transport.zip`.
+
+Package metadata содержит зависимость `modx >=3.0.0,<4.0.0`, поэтому Package Manager должен отклонить установку вне ветки MODX 3.x. При upgrade существующие значения `modxmcp.*` не перезаписываются.
+
+Сборка через CLI:
+
+```bash
+MODX_CONFIG_CORE=/full/path/to/config.core.php php _build/build.transport.php
+```
+
+Для release smoke-test на отдельном MODX 3-сайте можно использовать CLI verifier:
+
+```bash
+MODX_CONFIG_CORE=/full/path/to/config.core.php php _build/install.transport.php
+MODX_CONFIG_CORE=/full/path/to/config.core.php php _build/install.transport.php --action=uninstall
+```
+
+Успешный uninstall verifier требует полного удаления component directories, namespace `modxmcp`, обоих Manager menu и `modxmcp.*` settings; только после этого он выводит `TRANSPORT_UNINSTALL_VERIFY_OK`.
 
 ## Подключение
 
