@@ -166,25 +166,31 @@ if ($modx->getCacheManager()) {
 }
 
 $ns = $modx->getObject(modNamespace::class, array('name' => 'modxmcp'));
-$countSettings = $modx->getCount(modSystemSetting::class, array('key:LIKE' => 'modxmcp.%'));
+$countSettings = (int)$modx->getCount(modSystemSetting::class, array('key:LIKE' => 'modxmcp.%'));
+$expectedSettings = 16;
 $tokenSetting = $modx->getObject(modSystemSetting::class, array('key' => 'modxmcp.api_token'));
 $token = $tokenSetting ? trim((string)$tokenSetting->get('value')) : '';
 $enabledSetting = $modx->getObject(modSystemSetting::class, array('key' => 'modxmcp.enabled'));
+$rootMenu = $modx->getObject(modMenu::class, array('text' => 'modxmcp'));
+$graphMenu = $modx->getObject(modMenu::class, array('text' => 'modxmcp_graph'));
+$apiFile = MODX_ASSETS_PATH . 'components/modxmcp/api.php';
+$modelFile = MODX_CORE_PATH . 'components/modxmcp/model/modxmcp.class.php';
 
 echo 'signature: ' . $signature . PHP_EOL;
 echo 'namespace modxmcp: ' . ($ns ? 'yes' : 'NO') . PHP_EOL;
-echo 'modxmcp.* settings: ' . $countSettings . PHP_EOL;
+echo 'modxmcp.* settings: ' . $countSettings . '/' . $expectedSettings . PHP_EOL;
+echo 'menu modxmcp: ' . ($rootMenu ? 'yes' : 'NO') . PHP_EOL;
+echo 'menu modxmcp_graph: ' . ($graphMenu ? 'yes' : 'NO') . PHP_EOL;
 echo 'enabled: ' . ($enabledSetting ? var_export($enabledSetting->get('value'), true) : 'missing') . PHP_EOL;
 echo 'api_token: ' . ($token !== '' ? ('set, ' . strlen($token) . ' chars') : 'EMPTY') . PHP_EOL;
 if (!empty($options['show-token']) && $token !== '') {
     echo 'TOKEN=' . $token . PHP_EOL;
 }
-echo 'file assets/api.php: ' . (is_file(MODX_ASSETS_PATH . 'components/modxmcp/api.php') ? 'yes' : 'NO') . PHP_EOL;
-echo 'file core/model: ' . (is_file(MODX_CORE_PATH . 'components/modxmcp/model/modxmcp.class.php') ? 'yes' : 'NO') . PHP_EOL;
+echo 'file assets/api.php: ' . (is_file($apiFile) ? 'yes' : 'NO') . PHP_EOL;
+echo 'file core/model: ' . (is_file($modelFile) ? 'yes' : 'NO') . PHP_EOL;
 
-if (!$ns || $countSettings < 1 || $token === '' ||
-    !is_file(MODX_ASSETS_PATH . 'components/modxmcp/api.php') ||
-    !is_file(MODX_CORE_PATH . 'components/modxmcp/model/modxmcp.class.php')) {
+if (!$ns || $countSettings !== $expectedSettings || !$rootMenu || !$graphMenu ||
+    !$enabledSetting || $token === '' || !is_file($apiFile) || !is_file($modelFile)) {
     fwrite(STDERR, "Transport verification FAILED.\n");
     exit(6);
 }
