@@ -238,6 +238,10 @@ for needle, message in {
     "rename($stageAssets, $targetAssets)": "headless installer: atomic assets swap missing",
     "$deployCommitted = true": "headless installer: successful deployment commit marker missing",
     "$copyTree($runtimeLogs, $stageCore . DIRECTORY_SEPARATOR . 'logs')": "headless installer: runtime audit logs must survive update",
+    "$modx->beginTransaction()": "headless installer: MODX database transaction missing",
+    "$modx->rollback()": "headless installer: database rollback missing",
+    "$modx->commit()": "headless installer: database commit missing",
+    "$dbTransactionOpen = false": "headless installer: transaction state tracking missing",
 }.items():
     if needle not in headless_text:
         fail(message)
