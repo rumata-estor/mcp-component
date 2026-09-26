@@ -158,8 +158,9 @@ $assetsVehicle = $builder->createVehicle(
 );
 $assetsVehicle->resolve('php', array('source' => $sources['resolvers'] . 'resolve.token.php'));
 $assetsVehicle->resolve('php', array('source' => $sources['resolvers'] . 'resolve.integrations.php'));
+$assetsVehicle->resolve('php', array('source' => $sources['resolvers'] . 'resolve.settings.php'));
 $builder->putVehicle($assetsVehicle);
-$modx->log(modX::LOG_LEVEL_INFO, 'Packaged core + assets files and the api_token resolver.');
+$modx->log(modX::LOG_LEVEL_INFO, 'Packaged core + assets files and install/uninstall resolvers.');
 
 /* ---- package attributes ---- */
 $builder->setPackageAttributes(array(
