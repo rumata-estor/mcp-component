@@ -45,6 +45,13 @@ $modx->initialize('mgr');
 $modx->setLogLevel(modX::LOG_LEVEL_INFO);
 $modx->setLogTarget('ECHO');
 
+$versionData = $modx->getVersionData();
+$fullVersion = isset($versionData['full_version']) ? (string)$versionData['full_version'] : '';
+if ($fullVersion === '' || version_compare($fullVersion, '3.0.0', '<') || version_compare($fullVersion, '4.0.0', '>=')) {
+    fwrite(STDERR, "MODX3 MCP requires MODX Revolution 3.x; detected: " . ($fullVersion !== '' ? $fullVersion : 'unknown') . "\n");
+    exit(3);
+}
+
 $sourceCore = $root . 'core/components/modxmcp';
 $sourceAssets = $root . 'assets/components/modxmcp';
 $targetCore = rtrim(MODX_CORE_PATH, '/\\') . DIRECTORY_SEPARATOR . 'components' . DIRECTORY_SEPARATOR . 'modxmcp';
