@@ -62,6 +62,16 @@ MODX_CONFIG_CORE=/full/path/to/config.core.php php _build/install.transport.php 
 
 Успешный uninstall verifier требует полного удаления component directories, namespace `modxmcp`, обоих Manager menu и `modxmcp.*` settings; только после этого он выводит `TRANSPORT_UNINSTALL_VERIFY_OK`.
 
+### Полный release smoke на втором сайте
+
+На отдельном тестовом MODX 3-сайте весь цикл можно прогнать одной командой:
+
+```bash
+MODX_CONFIG_CORE=/full/path/to/config.core.php bash _build/release.smoke.sh
+```
+
+Runner выполняет PHP lint, локальные regression-проверки при наличии Python/Node, сборку transport package, fresh install, HTTPS/token/API smoke, безопасный CRUD временного chunk, повторную установку с проверкой сохранности всех 16 settings, clean uninstall и финальную установку с read-only MCP smoke. API token в вывод не попадает. По умолчанию сайт остаётся с установленным компонентом; `--leave-uninstalled` оставляет его удалённым после проверки.
+
 ## Подключение
 
 В `.mcp.json` проекта указать адрес сайта и токен, затем переподключить MCP (`/mcp`):
