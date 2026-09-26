@@ -1,3 +1,5 @@
+[Reading 5342 lines from start (total: 5342 lines, 0 remaining)]
+
 <?php
 
 use MODX\Revolution\modX;
@@ -265,6 +267,8 @@ class modxMCP {
             'resource_tvs' => array(
                 'get_resource_tvs'    => 'getResourceTvs',
                 'update_resource_tvs' => 'updateResourceTvs',
+                'list_tv_values'      => 'listTvValues',
+                'clear_tv_values'     => 'clearTvValues',
             ),
             'tv_inputs' => array(
                 'list_tv_input_types' => array('m' => 'listTvInputTypes', 'call' => 'bare'),
@@ -863,6 +867,9 @@ class modxMCP {
                 'parent' => (int) $r->get('parent'),
                 'template' => (int) $r->get('template'),
                 'published' => (bool) $r->get('published'),
+                'deleted' => (bool) $r->get('deleted'),
+                'deletedon' => (int) $r->get('deletedon'),
+                'deletedby' => (int) $r->get('deletedby'),
                 'isfolder' => (bool) $r->get('isfolder'),
                 'class_key' => $r->get('class_key'),
                 'context_key' => $r->get('context_key'),
@@ -3818,12 +3825,113 @@ class modxMCP {
         }
 
         foreach ($data['tvs'] as $tvName => $tvValue) {
-            $resource->setTVValue($tvName, $tvValue);
+            if (!$resource->setTVValue($tvName, $tvValue)) {
+                throw new ModxMCPClientException("Failed to save TV '{$tvName}' for resource {$resourceId}.");
+            }
         }
 
         $this->modx->cacheManager->refresh();
         $this->logAudit('update_resource_tvs', 'resource_tv', ['resource_id' => $resourceId, 'tv_keys' => array_keys($data['tvs'])]);
         return $this->getResourceTvs(['resource_id' => $resourceId]);
+    }
+
+    private function resolveTvForValueOperation(array $data) {
+        if (!empty($data['tv_id'])) {
+            $tv = $this->modx->getObject(\MODX\Revolution\modTemplateVar::class, (int)$data['tv_id']);
+        } elseif (!empty($data['tv_name'])) {
+            $tv = $this->modx->getObject(\MODX\Revolution\modTemplateVar::class, ['name' => $data['tv_name']]);
+        } else {
+            throw new ModxMCPClientException('tv_id or tv_name is required.');
+        }
+
+        if (!$tv) {
+            throw new ModxMCPClientException('TV not found.');
+        }
+
+        return $tv;
+    }
+
+    private function listTvValues(array $data) {
+        $tv = $this->resolveTvForValueOperation($data);
+        $tvId = (int)$tv->get('id');
+        $start = isset($data['start']) ? max(0, (int)$data['start']) : 0;
+        $limit = isset($data['limit']) ? max(1, min(500, (int)$data['limit'])) : 200;
+
+        $criteria = ['tmplvarid' => $tvId];
+        $total = (int)$this->modx->getCount(\MODX\Revolution\modTemplateVarResource::class, $criteria);
+
+        $q = $this->modx->newQuery(\MODX\Revolution\modTemplateVarResource::class);
+        $q->where($criteria);
+        $q->sortby('contentid', 'ASC');
+        $q->limit($limit, $start);
+
+        $values = [];
+        foreach ($this->modx->getCollection(\MODX\Revolution\modTemplateVarResource::class, $q) as $row) {
+            $resourceId = (int)$row->get('contentid');
+            $resource = $this->modx->getObject(\MODX\Revolution\modResource::class, $resourceId);
+            $values[] = [
+                'resource_id' => $resourceId,
+                'value' => $row->get('value'),
+                'resource_exists' => (bool)$resource,
+                'pagetitle' => $resource ? $resource->get('pagetitle') : null,
+                'uri' => $resource ? $resource->get('uri') : null,
+                'template' => $resource ? (int)$resource->get('template') : null,
+                'published' => $resource ? (bool)$resource->get('published') : null,
+                'deleted' => $resource ? (bool)$resource->get('deleted') : null,
+            ];
+        }
+
+        return [
+            'tv' => [
+                'id' => $tvId,
+                'name' => $tv->get('name'),
+                'caption' => $tv->get('caption'),
+                'default_text' => $tv->get('default_text'),
+                'templates' => $this->getTvTemplates($tvId),
+            ],
+            'total' => $total,
+            'start' => $start,
+            'count' => count($values),
+            'values' => $values,
+        ];
+    }
+
+    private function clearTvValues(array $data) {
+        $tv = $this->resolveTvForValueOperation($data);
+        $tvId = (int)$tv->get('id');
+        $criteria = ['tmplvarid' => $tvId];
+        $count = (int)$this->modx->getCount(\MODX\Revolution\modTemplateVarResource::class, $criteria);
+
+        if (empty($data['confirm'])) {
+            return [
+                'dry_run' => true,
+                'tv_id' => $tvId,
+                'tv_name' => $tv->get('name'),
+                'stored_values' => $count,
+                'message' => 'No values were removed. Pass confirm=true to execute.',
+            ];
+        }
+
+        return $this->runWithTransaction(function () use ($criteria, $tvId, $tv, $count) {
+            if ($count > 0) {
+                $this->modx->removeCollection(\MODX\Revolution\modTemplateVarResource::class, $criteria);
+            }
+
+            $remaining = (int)$this->modx->getCount(\MODX\Revolution\modTemplateVarResource::class, $criteria);
+            if ($remaining !== 0) {
+                throw new ModxMCPClientException("Failed to clear all TV values; {$remaining} record(s) remain.");
+            }
+
+            $this->modx->cacheManager->refresh();
+            $this->logAudit('clear_tv_values', 'tv', ['id' => $tvId, 'removed' => $count]);
+
+            return [
+                'tv_id' => $tvId,
+                'tv_name' => $tv->get('name'),
+                'removed' => $count,
+                'remaining' => 0,
+            ];
+        });
     }
 
     /**
@@ -4280,7 +4388,7 @@ class modxMCP {
         return $payload;
     }
 
-    private function normalizeVirtualPageEvent(xPDOObject $event, $includeRoutes = false) {
+    private function normalizeVirtualPageEvent(\xPDO\Om\xPDOObject $event, $includeRoutes = false) {
         $result = $event->toArray();
         $result['id'] = (int)$result['id'];
         $result['rank'] = (int)$result['rank'];
@@ -4296,7 +4404,7 @@ class modxMCP {
         return $result;
     }
 
-    private function normalizeVirtualPageHandler(xPDOObject $handler, $includeRoutes = false) {
+    private function normalizeVirtualPageHandler(\xPDO\Om\xPDOObject $handler, $includeRoutes = false) {
         $result = $handler->toArray();
         $result['id'] = (int)$result['id'];
         $result['type'] = (int)$result['type'];
@@ -4316,7 +4424,7 @@ class modxMCP {
         return $result;
     }
 
-    private function normalizeVirtualPageRoute(xPDOObject $route) {
+    private function normalizeVirtualPageRoute(\xPDO\Om\xPDOObject $route) {
         $result = $route->toArray();
         $event = $route->getOne('Event');
         $handler = $route->getOne('Handler');
@@ -4479,7 +4587,7 @@ class modxMCP {
         return $result;
     }
 
-    private function applyVirtualPageListFilters(xPDOQuery $query, array $data, array $fields, $alias = '') {
+    private function applyVirtualPageListFilters(\xPDO\Om\xPDOQuery $query, array $data, array $fields, $alias = '') {
         foreach ($fields as $field) {
             if (!array_key_exists($field, $data) || $data[$field] === '' || $data[$field] === null) {
                 continue;
@@ -4902,7 +5010,7 @@ class modxMCP {
         return $this->modx->getOption('versionx.core_path', null, $this->modx->getOption('core_path') . 'components/versionx/');
     }
 
-    private function normalizeVersionXVersion(xPDOObject $version, array $meta, $includePayload = false) {
+    private function normalizeVersionXVersion(\xPDO\Om\xPDOObject $version, array $meta, $includePayload = false) {
         $labelField = $meta['label'];
         $result = [
             'version_id' => (int)$version->get('version_id'),
@@ -4936,7 +5044,7 @@ class modxMCP {
         return $result;
     }
 
-    private function getVersionXContent(xPDOObject $version) {
+    private function getVersionXContent(\xPDO\Om\xPDOObject $version) {
         foreach (['content', 'snippet', 'plugincode'] as $field) {
             $value = $version->get($field);
             if ($value !== null) {
@@ -4946,7 +5054,7 @@ class modxMCP {
         return null;
     }
 
-    private function getLiveObjectLabel(xPDOObject $object) {
+    private function getLiveObjectLabel(\xPDO\Om\xPDOObject $object) {
         foreach (['pagetitle', 'name', 'templatename', 'caption'] as $field) {
             $value = $object->get($field);
             if ($value !== null && $value !== '') {
@@ -4966,7 +5074,7 @@ class modxMCP {
         return null;
     }
 
-    private function normalizeSystemSetting(modSystemSetting $setting) {
+    private function normalizeSystemSetting(\MODX\Revolution\modSystemSetting $setting) {
         return [
             'id' => $setting->get('id'),
             'key' => $setting->get('key'),
@@ -5234,3 +5342,5 @@ class modxMCP {
         return $this->joinMediaSourcePath($roots[$scope], $safeName);
     }
 }
+
+[executed on device: 363801.fornex.cloud (8f5f64bb-f348-43b3-8961-b53f304c8ad7)]
