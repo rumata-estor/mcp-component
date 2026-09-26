@@ -43,6 +43,11 @@ class ModxmcpIndexManagerController extends modExtraManagerController {
         $this->modx->lexicon->load('modxmcp:default');
         $token = (string) $this->modx->getOption('modxmcp.api_token');
         $siteUrl = rtrim((string) $this->modx->getOption('site_url'), '/');
+        $assetsUrl = (string) $this->modx->getOption('assets_url', null, '/assets/');
+        if (!preg_match('#^https?://#i', $assetsUrl)) {
+            $assetsUrl = $siteUrl . '/' . ltrim($assetsUrl, '/');
+        }
+        $endpoint = rtrim($assetsUrl, '/') . '/components/modxmcp/api.php';
 
         $integrations = array();
         $modelFile = $this->modx->getOption('core_path') . 'components/modxmcp/model/modxmcp.class.php';
@@ -105,7 +110,7 @@ class ModxmcpIndexManagerController extends modExtraManagerController {
             'token_full'      => $token !== '' ? $token : '—',
             'auto_static'     => $this->modx->getOption('modxmcp.auto_static') ? 1 : 0,
             'audit_log'       => $this->modx->getOption('modxmcp.audit_log') ? 1 : 0,
-            'endpoint'        => $siteUrl . '/assets/components/modxmcp/api.php',
+            'endpoint'        => $endpoint,
             'integrations'    => $integrations,
             'components'      => $components,
             'features'        => $features,
