@@ -162,6 +162,8 @@ builder_requirements = {
     "'license'": "transport package must include license attribute",
     "'readme'": "transport package must include readme attribute",
     "'changelog'": "transport package must include changelog attribute",
+    "'requires'": "transport package must declare platform dependencies",
+    "'modx' => '>=3.0.0 <4.0.0'": "transport package must restrict installation to MODX 3.x",
 }
 for needle, message in builder_requirements.items():
     if needle not in builder:
@@ -170,6 +172,8 @@ if "'modxmcp'" not in builder or "'modxmcp_graph'" not in builder:
     fail("transport builder: both manager menu entries are required")
 
 headless_text = (ROOT / "_build/install.headless.php").read_text()
+if "getVersionData()" not in headless_text or "version_compare($fullVersion, '3.0.0', '<')" not in headless_text or "version_compare($fullVersion, '4.0.0', '>=')" not in headless_text:
+    fail("headless installer: explicit MODX 3.x preflight guard missing")
 for menu_key in ["'modxmcp'", "'modxmcp_graph'"]:
     if menu_key not in headless_text:
         fail(f"headless installer: manager menu missing {menu_key}")
