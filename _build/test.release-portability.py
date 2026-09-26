@@ -195,6 +195,12 @@ if "modxmcp.trust_proxy_https" not in api:
     fail("api.php: explicit reverse-proxy HTTPS trust setting missing")
 if "HTTP_X_FORWARDED_FOR" in api:
     fail("api.php: X-Forwarded-For must not be trusted for IP allowlist")
+content_length_pos = api.find("CONTENT_LENGTH")
+input_read_pos = api.find("file_get_contents('php://input')")
+if content_length_pos < 0 or input_read_pos < 0 or content_length_pos > input_read_pos:
+    fail("api.php: Content-Length payload limit must be checked before reading request body")
+if "$rawInput === false" not in api:
+    fail("api.php: request-body read failure must be handled explicitly")
 https_pos = api.find("modxmcp.require_https")
 health_get_pos = api.find("REQUEST_METHOD'] === 'GET'")
 if https_pos < 0 or health_get_pos < 0 or https_pos > health_get_pos:
