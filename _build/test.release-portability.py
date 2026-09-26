@@ -97,13 +97,41 @@ if transport_keys != headless_keys:
     only_headless = sorted(headless_keys - transport_keys)
     fail(f"settings parity mismatch; transport-only={only_transport}, headless-only={only_headless}")
 
-def parse_simple_default(text, key, headless_mode=False):
+def parse_setting_defs(text, headless_mode=False):
+    value = r"(?:'[^']*'|\"[^\"]*\"|-?\d+)"
     if headless_mode:
-        pattern = rf"'{re.escape(key)}'\s*=>\s*array\(\s*([^,\n]+)"
+        pattern = re.compile(
+            rf"'(?P<key>modxmcp\.[^']+)'\s*=>\s*array\(\s*"
+            rf"(?P<value>{value})\s*,\s*'(?P<xtype>[^']+)'\s*,\s*'(?P<area>[^']+)'\s*\)",
+            re.S,
+        )
     else:
-        pattern = rf"array\('{re.escape(key)}',\s*([^,\n]+)"
-    m = re.search(pattern, text)
-    return None if not m else m.group(1).strip().strip("'\"")
+        pattern = re.compile(
+            rf"array\(\s*'(?P<key>modxmcp\.[^']+)'\s*,\s*"
+            rf"(?P<value>{value})\s*,\s*'(?P<xtype>[^']+)'\s*,\s*'(?P<area>[^']+)'\s*\)",
+            re.S,
+        )
+    out = {}
+    for m in pattern.finditer(text):
+        raw = m.group("value").strip()
+        if len(raw) >= 2 and raw[0] in "'\"" and raw[-1] == raw[0]:
+            raw = raw[1:-1]
+        out[m.group("key")] = {
+            "value": raw,
+            "xtype": m.group("xtype"),
+            "area": m.group("area"),
+        }
+    return out
+
+transport_defs = parse_setting_defs(transport, False)
+headless_defs = parse_setting_defs(headless, True)
+if set(transport_defs) != transport_keys:
+    fail(f"could not parse all transport setting definitions: parsed={len(transport_defs)} expected={len(transport_keys)}")
+if set(headless_defs) != headless_keys:
+    fail(f"could not parse all headless setting definitions: parsed={len(headless_defs)} expected={len(headless_keys)}")
+for key in sorted(transport_keys & headless_keys):
+    if transport_defs.get(key) != headless_defs.get(key):
+        fail(f"setting definition mismatch for {key}: transport={transport_defs.get(key)} headless={headless_defs.get(key)}")
 
 expected_defaults = {
     "modxmcp.service_user_id": "0",
@@ -115,15 +143,13 @@ expected_defaults = {
     "modxmcp.debug": "0",
 }
 for key, expected in expected_defaults.items():
-    if key not in transport_keys or key not in headless_keys:
+    if key not in transport_defs or key not in headless_defs:
         fail(f"required setting missing: {key}")
         continue
-    t_value = parse_simple_default(transport, key, False)
-    h_value = parse_simple_default(headless, key, True)
-    if t_value != expected:
-        fail(f"unsafe/unexpected transport default {key}={t_value}; expected {expected}")
-    if h_value != expected:
-        fail(f"unsafe/unexpected headless default {key}={h_value}; expected {expected}")
+    if transport_defs[key]["value"] != expected:
+        fail(f"unsafe/unexpected transport default {key}={transport_defs[key]['value']}; expected {expected}")
+    if headless_defs[key]["value"] != expected:
+        fail(f"unsafe/unexpected headless default {key}={headless_defs[key]['value']}; expected {expected}")
 
 token_sources = [
     ROOT / "_build/resolvers/resolve.token.php",
