@@ -191,6 +191,14 @@ if "modxmcp.trust_proxy_https" not in api:
     fail("api.php: explicit reverse-proxy HTTPS trust setting missing")
 if "HTTP_X_FORWARDED_FOR" in api:
     fail("api.php: X-Forwarded-For must not be trusted for IP allowlist")
+https_pos = api.find("modxmcp.require_https")
+health_get_pos = api.find("REQUEST_METHOD'] === 'GET'")
+if https_pos < 0 or health_get_pos < 0 or https_pos > health_get_pos:
+    fail("api.php: HTTPS enforcement must run before the unauthenticated health GET")
+
+tx_match = re.search(r"private function runWithTransaction\(callable \$callback\).*?\n    \}", model_text, re.S)
+if not tx_match or "catch (Throwable $e)" not in tx_match.group(0):
+    fail("model: runWithTransaction must rollback on Throwable, not only Exception")
 
 if errors:
     print("MODX3 MCP portability check FAILED:")
