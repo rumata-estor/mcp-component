@@ -6,7 +6,7 @@ $_lang['setting_modxmcp.api_token'] = 'API-токен MODX MCP';
 $_lang['setting_modxmcp.api_token_desc'] = 'Секретный токен, который передаётся в заголовке X-MCP-Token для авторизации всех запросов к MCP API.';
 
 $_lang['setting_modxmcp.service_user_id'] = 'ID сервисного пользователя';
-$_lang['setting_modxmcp.service_user_id_desc'] = 'ID пользователя MODX, от имени которого MCP выполняет процессоры и административные действия. Пользователь должен существовать и быть активным.';
+$_lang['setting_modxmcp.service_user_id_desc'] = 'ID пользователя MODX, от имени которого MCP выполняет процессоры и административные действия. Пользователь должен существовать, быть активным и иметь sudo=1.';
 
 $_lang['setting_modxmcp.debug'] = 'Режим отладки MCP';
 $_lang['setting_modxmcp.debug_desc'] = 'Если включено, API будет возвращать подробности внутренних ошибок в ответе. В продакшене рекомендуется держать выключенным.';
