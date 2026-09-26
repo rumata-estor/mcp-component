@@ -45,6 +45,14 @@ if (!$config || !file_exists($config)) {
 if (!$config || !file_exists($config)) {
     die("modxMCP build: cannot find config.core.php. Set the MODX_CONFIG_CORE env var to its full path.\n");
 }
+
+// Some MODX installations derive MODX_CORE_PATH from DOCUMENT_ROOT even for CLI.
+// When MODX_CONFIG_CORE points to the site's config.core.php, its directory is the
+// correct document root unless the caller already supplied DOCUMENT_ROOT explicitly.
+if (empty($_SERVER['DOCUMENT_ROOT'])) {
+    $_SERVER['DOCUMENT_ROOT'] = dirname($config);
+}
+
 require_once $config;
 require_once MODX_CORE_PATH . 'vendor/autoload.php';
 
@@ -100,6 +108,7 @@ $menu->fromArray(array(
     'handler'     => '',
     'action'      => 'index',
     'namespace'   => PKG_NAMESPACE,
+    'permissions' => 'settings',
 ), '', true, true);
 $menuVehicle = $builder->createVehicle($menu, array(
     xPDOTransport::PRESERVE_KEYS => true,
@@ -122,6 +131,7 @@ $menuGraph->fromArray(array(
     'handler'     => '',
     'action'      => 'graph',
     'namespace'   => PKG_NAMESPACE,
+    'permissions' => 'settings',
 ), '', true, true);
 $menuGraphVehicle = $builder->createVehicle($menuGraph, array(
     xPDOTransport::PRESERVE_KEYS => true,
@@ -153,6 +163,7 @@ $assetsVehicle = $builder->createVehicle(
 $assetsVehicle->resolve('php', array('source' => $sources['resolvers'] . 'resolve.token.php'));
 $assetsVehicle->resolve('php', array('source' => $sources['resolvers'] . 'resolve.service_user.php'));
 $assetsVehicle->resolve('php', array('source' => $sources['resolvers'] . 'resolve.integrations.php'));
+$assetsVehicle->resolve('php', array('source' => $sources['resolvers'] . 'resolve.cleanup.php'));
 $builder->putVehicle($assetsVehicle);
 $modx->log(modX::LOG_LEVEL_INFO, 'Packaged core + assets files and install resolvers.');
 
