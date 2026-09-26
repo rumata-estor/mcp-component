@@ -1,5 +1,6 @@
 <?php
 
+use MODX\Revolution\modMenu;
 use MODX\Revolution\modNamespace;
 use MODX\Revolution\modSystemSetting;
 use MODX\Revolution\modUser;
@@ -243,6 +244,21 @@ $namespaceSnapshot = $namespaceBefore ? array(
     'assets_path' => (string)$namespaceBefore->get('assets_path'),
 ) : array('exists' => false);
 
+$menuFields = array('text', 'parent', 'action', 'description', 'namespace', 'permissions', 'menuindex', 'params', 'handler', 'icon');
+$menuSnapshots = array();
+foreach (array('modxmcp', 'modxmcp_graph') as $menuKey) {
+    $menuObject = $modx->getObject(modMenu::class, array('text' => $menuKey));
+    if (!$menuObject) {
+        $menuSnapshots[$menuKey] = array('exists' => false);
+        continue;
+    }
+    $snapshot = array('exists' => true);
+    foreach ($menuFields as $field) {
+        $snapshot[$field] = $menuObject->get($field);
+    }
+    $menuSnapshots[$menuKey] = $snapshot;
+}
+
 $settingsSnapshot = array();
 $existingSettings = $modx->getCollection(modSystemSetting::class, array('key:LIKE' => 'modxmcp.%'));
 foreach ($existingSettings as $existingSetting) {
@@ -284,6 +300,8 @@ $rollback = static function () use (
     $assetsExisted,
     $settingsSnapshot,
     $namespaceSnapshot,
+    $menuSnapshots,
+    $menuFields,
     $removeTree,
     $copyTree
 ) {
@@ -336,6 +354,21 @@ $rollback = static function () use (
         $namespace->remove();
     }
 
+    foreach ($menuSnapshots as $menuKey => $snapshot) {
+        $menu = $modx->getObject(modMenu::class, array('text' => $menuKey));
+        if (!empty($snapshot['exists'])) {
+            if (!$menu) {
+                $menu = $modx->newObject(modMenu::class);
+            }
+            foreach ($menuFields as $field) {
+                $menu->set($field, $snapshot[$field]);
+            }
+            $menu->save();
+        } elseif ($menu) {
+            $menu->remove();
+        }
+    }
+
     if ($modx->getCacheManager()) {
         $modx->getCacheManager()->refresh();
     }
@@ -357,6 +390,45 @@ $namespace->set('path', '{core_path}components/modxmcp/');
 $namespace->set('assets_path', '{assets_path}components/modxmcp/');
 if (!$namespace->save()) {
     throw new RuntimeException("Failed to save modxmcp namespace.");
+}
+
+$menus = array(
+    'modxmcp' => array(
+        'text' => 'modxmcp',
+        'parent' => 'components',
+        'description' => 'modxmcp_menu_desc',
+        'icon' => '',
+        'menuindex' => 0,
+        'params' => '',
+        'handler' => '',
+        'action' => 'index',
+        'namespace' => 'modxmcp',
+        'permissions' => 'settings',
+    ),
+    'modxmcp_graph' => array(
+        'text' => 'modxmcp_graph',
+        'parent' => 'modxmcp',
+        'description' => 'modxmcp_graph_desc',
+        'icon' => '',
+        'menuindex' => 1,
+        'params' => '',
+        'handler' => '',
+        'action' => 'graph',
+        'namespace' => 'modxmcp',
+        'permissions' => 'settings',
+    ),
+);
+foreach ($menus as $menuKey => $menuData) {
+    $menu = $modx->getObject(modMenu::class, array('text' => $menuKey));
+    if (!$menu) {
+        $menu = $modx->newObject(modMenu::class);
+    }
+    foreach ($menuData as $field => $value) {
+        $menu->set($field, $value);
+    }
+    if (!$menu->save()) {
+        throw new RuntimeException("Failed to save manager menu: {$menuKey}");
+    }
 }
 
 $settings = array(
@@ -461,7 +533,7 @@ $endpointPath = '/assets/components/modxmcp/api.php';
 
 echo "\nmodxMCP headless install/update complete.\n";
 echo "Package Manager record created by this installer: no\n";
-echo "Manager menu created by this installer: no\n";
+echo "Manager menu created/updated by this installer: yes\n";
 echo "Core files: {$targetCore}\n";
 echo "Assets files: {$targetAssets}\n";
 echo "Endpoint path: {$endpointPath}\n";
