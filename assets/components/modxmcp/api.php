@@ -14,6 +14,62 @@ $modx->initialize('mgr');
 $modx->setLogLevel(modX::LOG_LEVEL_ERROR);
 
 header('Content-Type: application/json; charset=utf-8');
+header('Cache-Control: no-store');
+header('X-Content-Type-Options: nosniff');
+
+$clientIp = isset($_SERVER['REMOTE_ADDR']) ? trim((string) $_SERVER['REMOTE_ADDR']) : '';
+
+$ipMatchesRule = static function ($ip, $rule) {
+    $ip = trim((string) $ip);
+    $rule = trim((string) $rule);
+    if ($ip === '' || $rule === '') {
+        return false;
+    }
+
+    if (strpos($rule, '/') === false) {
+        $ipBinary = @inet_pton($ip);
+        $ruleBinary = @inet_pton($rule);
+        return $ipBinary !== false && $ruleBinary !== false && hash_equals($ruleBinary, $ipBinary);
+    }
+
+    list($subnet, $bitsRaw) = array_pad(explode('/', $rule, 2), 2, '');
+    if ($bitsRaw === '' || !ctype_digit($bitsRaw)) {
+        return false;
+    }
+
+    $ipBinary = @inet_pton($ip);
+    $subnetBinary = @inet_pton(trim($subnet));
+    if ($ipBinary === false || $subnetBinary === false || strlen($ipBinary) !== strlen($subnetBinary)) {
+        return false;
+    }
+
+    $bits = (int) $bitsRaw;
+    $maxBits = strlen($ipBinary) * 8;
+    if ($bits < 0 || $bits > $maxBits) {
+        return false;
+    }
+
+    $fullBytes = intdiv($bits, 8);
+    $remainingBits = $bits % 8;
+    if ($fullBytes > 0 && !hash_equals(substr($subnetBinary, 0, $fullBytes), substr($ipBinary, 0, $fullBytes))) {
+        return false;
+    }
+    if ($remainingBits === 0) {
+        return true;
+    }
+
+    $mask = (0xFF << (8 - $remainingBits)) & 0xFF;
+    return (ord($subnetBinary[$fullBytes]) & $mask) === (ord($ipBinary[$fullBytes]) & $mask);
+};
+
+$ipMatchesRules = static function ($ip, $csv) use ($ipMatchesRule) {
+    foreach (explode(',', (string) $csv) as $rule) {
+        if ($ipMatchesRule($ip, $rule)) {
+            return true;
+        }
+    }
+    return false;
+};
 
 // Lightweight unauthenticated health/version probe (GET) for client/server skew detection.
 // Returns only non-sensitive info: component name, server build version, enabled flag.
@@ -53,46 +109,36 @@ if (!$isEnabled) {
     exit;
 }
 
-// Optional HTTPS enforcement (modxmcp.require_https, off by default). Honours a
-// reverse-proxy X-Forwarded-Proto header in addition to direct HTTPS / port 443.
+// HTTPS enforcement. Direct HTTPS is trusted. X-Forwarded-Proto is trusted only
+// when REMOTE_ADDR belongs to modxmcp.trusted_proxy_ips; otherwise any client could spoof it.
 if ((bool) $modx->getOption('modxmcp.require_https', null, false)) {
-    $isHttps = (!empty($_SERVER['HTTPS']) && strtolower($_SERVER['HTTPS']) !== 'off')
-        || (isset($_SERVER['SERVER_PORT']) && (int) $_SERVER['SERVER_PORT'] === 443)
-        || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower($_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https');
-    if (!$isHttps) {
+    $directHttps = (!empty($_SERVER['HTTPS']) && strtolower((string) $_SERVER['HTTPS']) !== 'off')
+        || (isset($_SERVER['SERVER_PORT']) && (int) $_SERVER['SERVER_PORT'] === 443);
+
+    $forwardedHttps = false;
+    $trustedProxyIps = trim((string) $modx->getOption('modxmcp.trusted_proxy_ips', null, ''));
+    if (!$directHttps && $trustedProxyIps !== '' && $ipMatchesRules($clientIp, $trustedProxyIps)) {
+        $forwardedProto = isset($_SERVER['HTTP_X_FORWARDED_PROTO'])
+            ? strtolower(trim(explode(',', (string) $_SERVER['HTTP_X_FORWARDED_PROTO'])[0]))
+            : '';
+        $forwardedHttps = ($forwardedProto === 'https');
+    }
+
+    if (!$directHttps && !$forwardedHttps) {
         http_response_code(403);
         echo json_encode(['success' => false, 'error' => 'HTTPS required (modxmcp.require_https).'], JSON_UNESCAPED_UNICODE);
         exit;
     }
 }
 
-// Optional client-IP allowlist (modxmcp.allowed_ips). Empty = allow all. CSV of exact
-// IPs and/or IPv4 CIDR ranges (e.g. "203.0.113.4, 10.0.0.0/8"). Matched against REMOTE_ADDR
-// (the real socket peer) — X-Forwarded-For is intentionally NOT trusted (spoofable).
+// Optional client-IP allowlist (modxmcp.allowed_ips). Empty = allow all. Supports
+// exact IPv4/IPv6 addresses and CIDR ranges. It intentionally matches REMOTE_ADDR,
+// not X-Forwarded-For, so an untrusted client cannot spoof the source address.
 $allowedIps = trim((string) $modx->getOption('modxmcp.allowed_ips', null, ''));
-if ($allowedIps !== '') {
-    $clientIp = isset($_SERVER['REMOTE_ADDR']) ? (string) $_SERVER['REMOTE_ADDR'] : '';
-    $ipAllowed = false;
-    foreach (explode(',', $allowedIps) as $rule) {
-        $rule = trim($rule);
-        if ($rule === '') { continue; }
-        if (strpos($rule, '/') === false) {
-            if ($clientIp !== '' && $clientIp === $rule) { $ipAllowed = true; break; }
-            continue;
-        }
-        list($subnet, $bits) = array_pad(explode('/', $rule, 2), 2, '');
-        $bits = (int) $bits;
-        $ipLong = ip2long($clientIp);
-        $subLong = ip2long($subnet);
-        if ($ipLong === false || $subLong === false || $bits < 0 || $bits > 32) { continue; }
-        $mask = ($bits === 0) ? 0 : (~0 << (32 - $bits));
-        if (($ipLong & $mask) === ($subLong & $mask)) { $ipAllowed = true; break; }
-    }
-    if (!$ipAllowed) {
-        http_response_code(403);
-        echo json_encode(['success' => false, 'error' => 'Forbidden: client IP is not allowed (modxmcp.allowed_ips).'], JSON_UNESCAPED_UNICODE);
-        exit;
-    }
+if ($allowedIps !== '' && !$ipMatchesRules($clientIp, $allowedIps)) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'error' => 'Forbidden: client IP is not allowed (modxmcp.allowed_ips).'], JSON_UNESCAPED_UNICODE);
+    exit;
 }
 
 $expectedToken = $modx->getOption('modxmcp.api_token', null, '');
@@ -111,8 +157,23 @@ if (empty($expectedToken) || !hash_equals($expectedToken, $receivedToken)) {
     exit;
 }
 
-$rawInput = file_get_contents('php://input');
 $maxPayloadBytes = (int)$modx->getOption('modxmcp.max_payload_bytes', null, 1024 * 1024);
+$contentLength = isset($_SERVER['CONTENT_LENGTH']) ? (int) $_SERVER['CONTENT_LENGTH'] : 0;
+if ($maxPayloadBytes > 0 && $contentLength > $maxPayloadBytes) {
+    http_response_code(413);
+    echo json_encode([
+        'success' => false,
+        'error' => 'Payload Too Large',
+    ], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+$rawInput = file_get_contents('php://input');
+if ($rawInput === false) {
+    http_response_code(400);
+    echo json_encode(['success' => false, 'error' => 'Bad Request: request body is unreadable.'], JSON_UNESCAPED_UNICODE);
+    exit;
+}
 if ($maxPayloadBytes > 0 && strlen($rawInput) > $maxPayloadBytes) {
     http_response_code(413);
     echo json_encode([
