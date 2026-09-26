@@ -11,6 +11,7 @@ const {
 const axios = require("axios");
 const fs = require("fs");
 const path = require("path");
+const crypto = require("crypto");
 
 function loadLocalEnv() {
   const candidates = [
@@ -50,6 +51,158 @@ loadLocalEnv();
 
 const MODX_SITE_URL = process.env.MODX_MCP_SITE_URL;
 const API_TOKEN = process.env.MODX_MCP_TOKEN;
+const SITE_ID = process.env.MODX_MCP_SITE_ID || "";
+const MANAGER_ROOT = process.env.MODX_MCP_MANAGER_ROOT || "";
+const BACKUP_KEEP_COUNT = Math.max(1, Number(process.env.MODX_MCP_BACKUP_KEEP_COUNT || 20));
+const SKIP_AUTO_BACKUP = process.env.MODX_MCP_SKIP_AUTO_BACKUP === "1";
+
+
+const PROJECT_LOCK_READ_ONLY_TOOLS = new Set([
+  "modx_check_integrations",
+  "modx_dependency_graph",
+  "modx_describe_object",
+  "modx_find_usages",
+  "modx_get_component_files",
+  "modx_get_element",
+  "modx_get_media_source",
+  "modx_get_resource_tvs",
+  "modx_get_system_setting",
+  "modx_help",
+  "modx_list_actions",
+  "modx_list_elements",
+  "modx_list_installed_components",
+  "modx_list_media_source_files",
+  "modx_list_media_sources",
+  "modx_list_resources",
+  "modx_list_system_settings",
+  "modx_list_tv_input_types",
+  "modx_list_tv_values",
+  "modx_project_overview",
+  "modx_read_audit_log",
+  "modx_read_component_file",
+  "modx_read_error_log",
+  "modx_read_media_source_file",
+  "modx_search_code",
+  "modx_suggest_tv_type",
+  "modx_system_info",
+  "modx_view_element",
+]);
+
+function projectLockBootId() {
+  try {
+    return fs.readFileSync("/proc/sys/kernel/random/boot_id", "utf8").trim();
+  } catch (_) {
+    return "";
+  }
+}
+
+function projectLockOwner(lockDir) {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(lockDir, "owner.json"), "utf8"));
+  } catch (_) {
+    return {};
+  }
+}
+
+function projectLockPidAlive(pid) {
+  const n = Number(pid || 0);
+  if (!Number.isInteger(n) || n <= 0) return false;
+  try {
+    process.kill(n, 0);
+    return true;
+  } catch (e) {
+    return e && e.code === "EPERM";
+  }
+}
+
+function projectLockIsStale(lockDir, owner) {
+  const currentBoot = projectLockBootId();
+  const ownerBoot = String(owner.boot_id || "");
+  if (currentBoot && ownerBoot && currentBoot !== ownerBoot) return true;
+  if (owner.pid && !projectLockPidAlive(owner.pid)) return true;
+  if (!owner || Object.keys(owner).length === 0) {
+    try {
+      const ageMs = Date.now() - fs.statSync(lockDir).mtimeMs;
+      return ageMs > 30000;
+    } catch (_) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function projectLockRemove(lockDir) {
+  try {
+    fs.rmSync(lockDir, { recursive: true, force: true });
+  } catch (_) {}
+}
+
+function isProjectMutationTool(name) {
+  return String(name || "").startsWith("modx_") && !PROJECT_LOCK_READ_ONLY_TOOLS.has(name);
+}
+
+function acquireProjectLockForTool(name) {
+  if (!isProjectMutationTool(name) || !MANAGER_ROOT) return null;
+
+  const lockDir = path.join(MANAGER_ROOT, "project.lock");
+  const inherited = String(process.env.SITE_PROJECT_LOCK_TOKEN || "").trim();
+
+  if (fs.existsSync(lockDir)) {
+    let owner = projectLockOwner(lockDir);
+    if (inherited && owner.token === inherited) {
+      return { lockDir, token: inherited, nested: true };
+    }
+    if (projectLockIsStale(lockDir, owner)) {
+      projectLockRemove(lockDir);
+    } else {
+      throw new Error(
+        "PROJECT BUSY: " + (SITE_ID || "site") + "; " +
+        "source=" + (owner.source || "unknown") + " actor_id=" + (owner.actor_id || "unknown") + " " +
+        "since=" + (owner.started_at || "unknown") + " command=" + (owner.command || "unknown")
+      );
+    }
+  }
+
+  try {
+    fs.mkdirSync(lockDir, { mode: 0o700 });
+  } catch (e) {
+    if (e && e.code === "EEXIST") {
+      throw new Error("PROJECT BUSY: " + (SITE_ID || "site"));
+    }
+    throw e;
+  }
+
+  const token = crypto.randomUUID().replace(/-/g, "");
+  const record = {
+    format: 1,
+    site_id: SITE_ID,
+    token,
+    pid: process.pid,
+    boot_id: projectLockBootId(),
+    started_at: new Date().toISOString(),
+    source: process.env.AGENT_ACTOR_SOURCE || "mcp",
+    actor_id: process.env.AGENT_ACTOR_ID || "unknown",
+    actor_name: process.env.AGENT_ACTOR_NAME || "",
+    model: process.env.AGENT_MODEL || "unknown",
+    command: name,
+  };
+  const ownerFile = path.join(lockDir, "owner.json");
+  fs.writeFileSync(ownerFile, JSON.stringify(record, null, 2) + "\n", {
+    encoding: "utf8",
+    mode: 0o600,
+  });
+  try { fs.chmodSync(ownerFile, 0o600); } catch (_) {}
+  return { lockDir, token, nested: false };
+}
+
+function releaseProjectLock(lock) {
+  if (!lock || lock.nested) return;
+  const owner = projectLockOwner(lock.lockDir);
+  if (owner.token === lock.token) {
+    projectLockRemove(lock.lockDir);
+  }
+}
+
 
 if (!MODX_SITE_URL) {
   throw new Error(
@@ -110,6 +263,321 @@ async function modxApiRequest(payload) {
     }
     throw new Error(`Network Error: ${error.message}`);
   }
+}
+
+function safeFilePart(value) {
+  return String(value || "element")
+    .replace(/[^A-Za-z0-9._-]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 100) || "element";
+}
+
+function pruneBackupDirs(root) {
+  try {
+    const dirs = fs.readdirSync(root, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name)
+      .sort()
+      .reverse();
+    for (const name of dirs.slice(BACKUP_KEEP_COUNT)) {
+      fs.rmSync(path.join(root, name), { recursive: true, force: true });
+    }
+  } catch (e) {
+    console.error(`modxMCP: не удалось применить retention резервных копий: ${e.message}`);
+  }
+}
+
+async function autoBackupElement(type, args, action) {
+  if (SKIP_AUTO_BACKUP || !MANAGER_ROOT || !SITE_ID || !type) return null;
+
+  const lookup = {};
+  if (args && args.id !== undefined) lookup.id = args.id;
+  if (args && args.name) lookup.name = args.name;
+  if (!lookup.id && !lookup.name) {
+    throw new Error(`Safety backup failed: for ${action} missing element id/name`);
+  }
+
+  const current = await modxApiRequest({
+    action: "get_element",
+    type,
+    data: lookup,
+  });
+  if (!current || typeof current !== "object" || !current.data || typeof current.data !== "object") {
+    throw new Error(`Safety backup failed: cannot read current ${type}`);
+  }
+
+  const element = current.data;
+  const stamp = new Date().toISOString()
+    .replace("T", "_")
+    .replace("Z", "")
+    .replace(/[:.]/g, "-");
+  const root = path.join(MANAGER_ROOT, "modx-backups");
+  const dir = path.join(root, `${stamp}_auto_${safeFilePart(action)}`);
+  fs.mkdirSync(dir, { recursive: true });
+
+  const label = element.name || element.templatename || element.pagetitle || lookup.name || ("id-" + element.id);
+  const file = path.join(dir, `${safeFilePart(type)}--${safeFilePart(label)}.json`);
+  const record = {
+    format: 1,
+    site_id: SITE_ID,
+    type,
+    created_at: new Date().toISOString(),
+    auto: true,
+    action,
+    element,
+  };
+  fs.writeFileSync(file, JSON.stringify(record, null, 2), "utf8");
+  pruneBackupDirs(root);
+  console.error(`modxMCP: safety backup created: ${file}`);
+  return file;
+}
+
+async function autoBackupResourceTvs(args, action) {
+  if (SKIP_AUTO_BACKUP || !MANAGER_ROOT || !SITE_ID) return null;
+  const resourceId = Number(args?.resource_id || 0);
+  if (resourceId <= 0) {
+    throw new Error(`Safety backup failed: for ${action} missing resource_id`);
+  }
+
+  const current = await modxApiRequest({
+    action: "get_resource_tvs",
+    data: { resource_id: resourceId },
+  });
+  if (!current || typeof current !== "object" || !current.data || typeof current.data !== "object") {
+    throw new Error(`Safety backup failed: cannot read TV values for resource #${resourceId}`);
+  }
+
+  const stamp = new Date().toISOString()
+    .replace("T", "_")
+    .replace("Z", "")
+    .replace(/[:.]/g, "-");
+  const root = path.join(MANAGER_ROOT, "tv-backups");
+  const dir = path.join(root, `${stamp}_auto_${safeFilePart(action)}`);
+  fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+  try { fs.chmodSync(root, 0o700); } catch (_) {}
+  try { fs.chmodSync(dir, 0o700); } catch (_) {}
+
+  const file = path.join(dir, `resource--${resourceId}--tvs.json`);
+  const record = {
+    format: 1,
+    site_id: SITE_ID,
+    type: "resource_tvs",
+    created_at: new Date().toISOString(),
+    auto: true,
+    action,
+    resource_id: resourceId,
+    requested_tv_keys: Object.keys(args?.tvs || {}),
+    state: current.data,
+  };
+  fs.writeFileSync(file, JSON.stringify(record, null, 2), { encoding: "utf8", mode: 0o600 });
+  try { fs.chmodSync(file, 0o600); } catch (_) {}
+  pruneBackupDirs(root);
+  console.error(`modxMCP: TV safety backup created: ${file}`);
+  return file;
+}
+
+async function autoBackupAllTvValues(args, action) {
+  if (SKIP_AUTO_BACKUP || !MANAGER_ROOT || !SITE_ID) return null;
+  const tvId = Number(args?.tv_id || args?.id || 0);
+  const tvName = String(args?.tv_name || args?.name || "");
+  if (tvId <= 0 && !tvName) {
+    throw new Error(`Safety backup failed: for ${action} missing TV id/name`);
+  }
+
+  const values = [];
+  let start = 0;
+  let total = null;
+  let tv = null;
+
+  while (true) {
+    const data = tvId > 0
+      ? { tv_id: tvId, start, limit: 500 }
+      : { tv_name: tvName, start, limit: 500 };
+    const page = await modxApiRequest({ action: "list_tv_values", data });
+    const payload = page?.data;
+    if (!payload || typeof payload !== "object") {
+      throw new Error("Safety backup failed: cannot read stored TV values");
+    }
+    if (!tv) tv = payload.tv || null;
+    if (total === null) total = Number(payload.total || 0);
+    const rows = Array.isArray(payload.values) ? payload.values : [];
+    values.push(...rows);
+    if (rows.length === 0 || values.length >= total) break;
+    start += rows.length;
+    if (start > 1000000) throw new Error("Safety backup failed: TV values pagination overflow");
+  }
+
+  const stamp = new Date().toISOString()
+    .replace("T", "_")
+    .replace("Z", "")
+    .replace(/[:.]/g, "-");
+  const root = path.join(MANAGER_ROOT, "tv-backups");
+  const dir = path.join(root, `${stamp}_auto_${safeFilePart(action)}`);
+  fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+  try { fs.chmodSync(root, 0o700); } catch (_) {}
+  try { fs.chmodSync(dir, 0o700); } catch (_) {}
+
+  const label = tv?.name || tvName || ("id-" + tvId);
+  const file = path.join(dir, `tv--${safeFilePart(label)}--stored-values.json`);
+  const record = {
+    format: 1,
+    site_id: SITE_ID,
+    type: "tv_stored_values",
+    created_at: new Date().toISOString(),
+    auto: true,
+    action,
+    tv,
+    total: values.length,
+    values,
+  };
+  fs.writeFileSync(file, JSON.stringify(record, null, 2), { encoding: "utf8", mode: 0o600 });
+  try { fs.chmodSync(file, 0o600); } catch (_) {}
+  pruneBackupDirs(root);
+  console.error(`modxMCP: stored TV values safety backup created: ${file}`);
+  return file;
+}
+
+async function autoBackupSystemSetting(args, action) {
+  if (SKIP_AUTO_BACKUP || !MANAGER_ROOT || !SITE_ID) return null;
+  if (!args || (!args.key && !args.id)) {
+    throw new Error(`Safety backup failed: for ${action} missing system setting key/id`);
+  }
+
+  const current = await modxApiRequest({
+    action: "get_system_setting",
+    data: args.key ? { key: args.key } : { id: args.id },
+  });
+  if (!current || typeof current !== "object" || !current.data || typeof current.data !== "object") {
+    throw new Error("Safety backup failed: cannot read current system setting");
+  }
+
+  const setting = current.data;
+  const stamp = new Date().toISOString()
+    .replace("T", "_")
+    .replace("Z", "")
+    .replace(/[:.]/g, "-");
+  const root = path.join(MANAGER_ROOT, "system-setting-backups");
+  const dir = path.join(root, `${stamp}_auto_${safeFilePart(action)}`);
+  fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+  try { fs.chmodSync(root, 0o700); } catch (_) {}
+  try { fs.chmodSync(dir, 0o700); } catch (_) {}
+
+  const key = setting.key || args.key || ("id-" + args.id);
+  const file = path.join(dir, `system-setting--${safeFilePart(key)}.json`);
+  const record = {
+    format: 1,
+    site_id: SITE_ID,
+    type: "system_setting",
+    created_at: new Date().toISOString(),
+    auto: true,
+    action,
+    setting,
+  };
+  fs.writeFileSync(file, JSON.stringify(record, null, 2), { encoding: "utf8", mode: 0o600 });
+  try { fs.chmodSync(file, 0o600); } catch (_) {}
+  pruneBackupDirs(root);
+  console.error(`modxMCP: system-setting safety backup created: ${file}`);
+  return file;
+}
+
+async function autoBackupForMutation(name, args) {
+  if (SKIP_AUTO_BACKUP) return [];
+
+  if (name === "modx_create_element" && ["chunk","snippet","template"].includes(String(args.type))) {
+    if (process.env.MODX_MCP_ALLOW_SAFE_ELEMENT_CREATE !== "1") {
+      throw new Error("Safety: direct element creation is disabled. Use the safe element creation workflow.");
+    }
+  }
+  if (name === "modx_create_element" && String(args.type) === "plugin") {
+    if (process.env.MODX_MCP_ALLOW_SAFE_PLUGIN_CREATE !== "1") {
+      throw new Error("Safety: direct plugin creation is disabled. Use the safe plugin workflow.");
+    }
+  }
+
+  if (name === "modx_update_element" || name === "modx_edit_element_lines") {
+    return [await autoBackupElement(args.type, args, name)];
+  }
+
+  if (name === "modx_delete_element" && !args.dry_run) {
+    if (args.type === "tv") {
+      if (process.env.MODX_MCP_ALLOW_STAGED_TV_DELETE !== "1") {
+        throw new Error("Safety: direct TV deletion is disabled. Use the staged TV deletion workflow.");
+      }
+      return [
+        await autoBackupElement(args.type, args, name),
+        await autoBackupAllTvValues({tv_id:args.id,tv_name:args.name}, name),
+      ];
+    }
+    if (["chunk","snippet","template"].includes(String(args.type))) {
+      if (process.env.MODX_MCP_ALLOW_STAGED_ELEMENT_DELETE !== "1") {
+        throw new Error("Safety: direct element deletion is disabled. Use the staged element deletion workflow.");
+      }
+    }
+    if (String(args.type) === "resource") {
+      if (process.env.MODX_MCP_ALLOW_STAGED_RESOURCE_DELETE !== "1") {
+        throw new Error("Safety: direct resource deletion is disabled. Use the staged resource deletion workflow.");
+      }
+    }
+    if (String(args.type) === "plugin") {
+      if (process.env.MODX_MCP_ALLOW_STAGED_PLUGIN_DELETE !== "1") {
+        throw new Error("Safety: direct plugin deletion is disabled. Use the staged plugin workflow.");
+      }
+    }
+    return [await autoBackupElement(args.type, args, name)];
+  }
+
+  if (name === "modx_bulk_resources" && args.dry_run !== true) {
+    if (String(args.operation) === "delete") {
+      if (process.env.MODX_MCP_ALLOW_STAGED_BULK_RESOURCE_DELETE !== "1") {
+        throw new Error("Safety: bulk resource deletion is disabled. Use the staged bulk resource workflow.");
+      }
+    } else if (process.env.MODX_MCP_ALLOW_SAFE_BULK_RESOURCES !== "1") {
+      throw new Error("Safety: direct bulk resource mutation is disabled. Run preview and use the safe bulk workflow.");
+    }
+  }
+
+  if (name === "modx_empty_recycle_bin") {
+    if (process.env.MODX_MCP_ALLOW_RECYCLE_PURGE !== "1") {
+      throw new Error("Safety: emptying the recycle bin is disabled. Use the dedicated purge workflow.");
+    }
+  }
+
+  if (["modx_install_package","modx_uninstall_package"].includes(name)) {
+    if (process.env.MODX_MCP_ALLOW_SAFE_PACKAGE_CHANGE !== "1") {
+      throw new Error("Safety: direct package install/uninstall is disabled. Use the dedicated package workflow with full file+database backup.");
+    }
+  }
+
+  if (["modx_create_provider","modx_update_provider","modx_delete_provider"].includes(name)) {
+    if (process.env.MODX_MCP_ALLOW_PROVIDER_CHANGE !== "1") {
+      throw new Error("Safety: transport provider mutation is disabled. Use the dedicated provider workflow.");
+    }
+  }
+
+  if (name === "modx_clear_tv_values" && args.confirm === true) {
+    return [await autoBackupAllTvValues(args, name)];
+  }
+
+  if (name === "modx_update_system_setting" || name === "modx_delete_system_setting") {
+    return [await autoBackupSystemSetting(args, name)];
+  }
+
+  if (name === "modx_update_resource_tvs") {
+    return [await autoBackupResourceTvs(args, name)];
+  }
+
+  if (name === "modx_make_static") {
+    if (Array.isArray(args.items) && args.items.length) {
+      const files = [];
+      for (const item of args.items) {
+        files.push(await autoBackupElement(item.type, item, name));
+      }
+      return files;
+    }
+    return [await autoBackupElement(args.type, args, name)];
+  }
+
+  return [];
 }
 
 const ELEMENT_TYPES = [
@@ -515,7 +983,7 @@ const toolDefinitions = [
   },
   {
     name: "modx_list_tv_values",
-    description: "List explicitly stored values for one TV across all resources, including stale values on resources whose current template may no longer use that TV.",
+    description: "List explicitly stored values for one TV across all resources, including stale values on resources whose current template may no longer use that TV. Use before deleting or restructuring a TV.",
     inputSchema: {
       type: "object",
       properties: {
@@ -528,13 +996,13 @@ const toolDefinitions = [
   },
   {
     name: "modx_clear_tv_values",
-    description: "Preview or clear every explicitly stored value for one TV. Without confirm=true this is a dry run and removes nothing.",
+    description: "Preview or clear every explicitly stored value for one TV. Safe by default: without confirm:true it only returns the number of stored values. Destructive; use only as part of the staged TV deletion workflow after backup.",
     inputSchema: {
       type: "object",
       properties: {
         tv_id: { type: "number" },
         tv_name: { type: "string" },
-        confirm: { type: "boolean", description: "Must be true to remove stored values." },
+        confirm: { type: "boolean", description: "Must be true to actually remove stored values." },
       },
     },
   },
@@ -1804,8 +2272,12 @@ function stringifyApiResult(result) {
 
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
+  let projectLock = null;
 
   try {
+    projectLock = acquireProjectLockForTool(name);
+    await autoBackupForMutation(name, args || {});
+
     if (name === "modx_list_elements") {
       const result = await modxApiRequest({
         action: "list_elements",
@@ -1870,6 +2342,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       content: [{ type: "text", text: `Error: ${error.message}` }],
       isError: true,
     };
+  } finally {
+    releaseProjectLock(projectLock);
   }
 });
 
