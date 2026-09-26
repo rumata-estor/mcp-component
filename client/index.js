@@ -1,3 +1,5 @@
+[Reading 1900 lines from start (total: 1900 lines, 0 remaining)]
+
 #!/usr/bin/env node
 
 const { Server } = require("@modelcontextprotocol/sdk/server/index.js");
@@ -96,8 +98,14 @@ async function modxApiRequest(payload) {
       },
     });
     if (response.data && typeof response.data === "object") noteCaps(response.data.caps);
+    if (response.data && typeof response.data === "object" && response.data.success === false) {
+      throw new Error(`MODX Error: ${response.data.error || JSON.stringify(response.data)}`);
+    }
     return response.data;
   } catch (error) {
+    if (!error.response && String(error.message || "").startsWith("MODX Error:")) {
+      throw error;
+    }
     if (error.response) {
       if (error.response.data && typeof error.response.data === "object") noteCaps(error.response.data.caps);
       throw new Error(`MODX Error: ${JSON.stringify(error.response.data)}`);
@@ -505,6 +513,31 @@ const toolDefinitions = [
         tvs: { type: "object" },
       },
       required: ["resource_id", "tvs"],
+    },
+  },
+  {
+    name: "modx_list_tv_values",
+    description: "List explicitly stored values for one TV across all resources, including stale values on resources whose current template may no longer use that TV.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        tv_id: { type: "number" },
+        tv_name: { type: "string" },
+        start: { type: "number" },
+        limit: { type: "number", description: "Page size, max 500." },
+      },
+    },
+  },
+  {
+    name: "modx_clear_tv_values",
+    description: "Preview or clear every explicitly stored value for one TV. Without confirm=true this is a dry run and removes nothing.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        tv_id: { type: "number" },
+        tv_name: { type: "string" },
+        confirm: { type: "boolean", description: "Must be true to remove stored values." },
+      },
     },
   },
   {
@@ -1763,6 +1796,14 @@ function formatCodeFromResult(resultData) {
   return resultData.snippet || resultData.plugincode || resultData.content || "";
 }
 
+function stringifyApiResult(result) {
+  const value = result && Object.prototype.hasOwnProperty.call(result, "data")
+    ? result.data
+    : result;
+  const encoded = JSON.stringify(value, null, 2);
+  return encoded === undefined ? String(value ?? "null") : encoded;
+}
+
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
 
@@ -1774,7 +1815,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         data: args,
       });
       return {
-        content: [{ type: "text", text: JSON.stringify(result.data, null, 2) }],
+        content: [{ type: "text", text: stringifyApiResult(result) }],
       };
     }
 
@@ -1810,7 +1851,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         data: args,
       });
       return {
-        content: [{ type: "text", text: JSON.stringify(result.data, null, 2) }],
+        content: [{ type: "text", text: stringifyApiResult(result) }],
       };
     }
 
@@ -1821,7 +1862,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         data: args,
       });
       return {
-        content: [{ type: "text", text: JSON.stringify(result.data, null, 2) }],
+        content: [{ type: "text", text: stringifyApiResult(result) }],
       };
     }
 
@@ -1859,3 +1900,5 @@ async function main() {
 }
 
 main().catch(console.error);
+
+[executed on device: 363801.fornex.cloud (8f5f64bb-f348-43b3-8961-b53f304c8ad7)]
