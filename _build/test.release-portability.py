@@ -175,6 +175,14 @@ if "['active' => 1, 'sudo' => 1]" not in model_text:
     fail("model: automatic service user selection must require active + sudo")
 if "if (!$user->get('sudo'))" not in model_text:
     fail("model: explicitly configured service user must already be sudo")
+if "$this->modx->user->set('sudo', 1)" in model_text or "$this->modx->user->set('sudo',1)" in model_text:
+    fail("model: processRequest must not elevate the service user to sudo in memory")
+cap_pos = model_text.find("$this->assertCapabilityEnabled($action)")
+dispatch_pos = model_text.find("$this->resolveActionSpec($action)")
+if cap_pos < 0 or dispatch_pos < 0 or cap_pos > dispatch_pos:
+    fail("model: capability enforcement must run before action dispatch")
+if "modxmcp.allow_run_processor', null, false" not in model_text:
+    fail("model: run_processor must remain independently gated off by default")
 
 settings_resolver = (ROOT / "_build/resolvers/resolve.settings.php").read_text()
 for needle, message in {
