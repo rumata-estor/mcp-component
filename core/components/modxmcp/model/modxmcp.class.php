@@ -3043,7 +3043,7 @@ class modxMCP {
             $result = $callback();
             $this->modx->commit();
             return $result;
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
             $this->modx->rollback();
             throw $e;
         }
