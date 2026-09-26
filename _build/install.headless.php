@@ -346,17 +346,21 @@ if ($modx->getCacheManager()) {
 }
 
 $siteUrl = rtrim((string) $modx->getOption('site_url'), '/');
-$endpointPath = '/assets/components/modxmcp/api.php';
+$assetsUrl = (string)$modx->getOption('assets_url', null, '/assets/');
+if (preg_match('#^//#', $assetsUrl)) {
+    $scheme = parse_url($siteUrl, PHP_URL_SCHEME);
+    $assetsUrl = ($scheme ? $scheme : 'https') . ':' . $assetsUrl;
+} elseif (!preg_match('#^https?://#i', $assetsUrl)) {
+    $assetsUrl = $siteUrl . '/' . ltrim($assetsUrl, '/');
+}
+$endpoint = rtrim($assetsUrl, '/') . '/components/modxmcp/api.php';
 
 echo "\nmodxMCP headless install/update complete.\n";
 echo "Package Manager record created by this installer: no\n";
 echo "Manager menu created by this installer: no\n";
 echo "Core files: {$targetCore}\n";
 echo "Assets files: {$targetAssets}\n";
-echo "Endpoint path: {$endpointPath}\n";
-if ($siteUrl !== '') {
-    echo "Endpoint from MODX site_url: {$siteUrl}{$endpointPath}\n";
-}
+echo "Endpoint: {$endpoint}\n";
 $showToken = $tokenGenerated || in_array('--show-token', $argv, true);
 if ($showToken) {
     echo "Token: {$token}\n";
@@ -364,4 +368,5 @@ if ($showToken) {
     $preview = strlen($token) > 12 ? substr($token, 0, 6) . '...' . substr($token, -4) : '[set]';
     echo "Token: {$preview} (use --show-token to print the full value)\n";
 }
-echo "Service user: #{$resolvedServiceUserId}\n";\necho "Variant: modx3\n";
+echo "Service user: #{$resolvedServiceUserId}\n";
+echo "Variant: modx3\n";
