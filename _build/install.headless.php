@@ -54,6 +54,92 @@ if (!is_dir($sourceCore) || !is_dir($sourceAssets)) {
     exit(2);
 }
 
+$removeTree = static function ($path) use (&$removeTree) {
+    if (is_dir($path) && !is_link($path)) {
+        $items = scandir($path);
+        if ($items === false) {
+            throw new RuntimeException("Cannot read directory: {$path}");
+        }
+        foreach ($items as $item) {
+            if ($item === '.' || $item === '..') {
+                continue;
+            }
+            $removeTree($path . DIRECTORY_SEPARATOR . $item);
+        }
+        if (!rmdir($path)) {
+            throw new RuntimeException("Cannot remove directory: {$path}");
+        }
+        return;
+    }
+
+    if (file_exists($path) || is_link($path)) {
+        if (!unlink($path)) {
+            throw new RuntimeException("Cannot remove file: {$path}");
+        }
+    }
+};
+
+$isPreservedPath = static function ($relative, array $prefixes) {
+    $relative = trim(str_replace('\\', '/', $relative), '/');
+    foreach ($prefixes as $prefix) {
+        $prefix = trim(str_replace('\\', '/', $prefix), '/');
+        if ($prefix === '') {
+            continue;
+        }
+        if ($relative === $prefix || strpos($relative, $prefix . '/') === 0) {
+            return true;
+        }
+    }
+    return false;
+};
+
+$pruneTree = static function ($sourceRoot, $targetRoot, $relative, array $preservePrefixes) use (&$pruneTree, $removeTree, $isPreservedPath) {
+    if (!is_dir($targetRoot)) {
+        return;
+    }
+
+    $targetDir = $relative === ''
+        ? $targetRoot
+        : $targetRoot . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relative);
+
+    if (!is_dir($targetDir)) {
+        return;
+    }
+
+    $items = scandir($targetDir);
+    if ($items === false) {
+        throw new RuntimeException("Cannot read directory: {$targetDir}");
+    }
+
+    foreach ($items as $item) {
+        if ($item === '.' || $item === '..') {
+            continue;
+        }
+
+        $childRelative = ltrim(($relative === '' ? '' : $relative . '/') . $item, '/');
+        if ($isPreservedPath($childRelative, $preservePrefixes)) {
+            continue;
+        }
+
+        $sourcePath = $sourceRoot . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $childRelative);
+        $targetPath = $targetRoot . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $childRelative);
+
+        if (!file_exists($sourcePath) && !is_link($sourcePath)) {
+            $removeTree($targetPath);
+            continue;
+        }
+
+        if (is_dir($sourcePath) !== is_dir($targetPath)) {
+            $removeTree($targetPath);
+            continue;
+        }
+
+        if (is_dir($targetPath)) {
+            $pruneTree($sourceRoot, $targetRoot, $childRelative, $preservePrefixes);
+        }
+    }
+};
+
 $copyTree = static function ($source, $target) use (&$copyTree) {
     if (!is_dir($target) && !mkdir($target, 0775, true) && !is_dir($target)) {
         throw new RuntimeException("Cannot create directory: {$target}");
@@ -82,6 +168,9 @@ $copyTree = static function ($source, $target) use (&$copyTree) {
 };
 
 try {
+    // Keep runtime audit logs, but remove obsolete shipped component files.
+    $pruneTree($sourceCore, $targetCore, '', array('logs'));
+    $pruneTree($sourceAssets, $targetAssets, '', array());
     $copyTree($sourceCore, $targetCore);
     $copyTree($sourceAssets, $targetAssets);
 } catch (Throwable $e) {
