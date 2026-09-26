@@ -55,7 +55,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        modx_ref: [v3.2.2-pl, 3.x]
+        modx_ref: [v3.0.0-pl, v3.2.4-pl, 3.x]
     steps:
       - uses: actions/checkout@v4
 
