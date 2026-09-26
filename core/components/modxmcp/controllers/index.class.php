@@ -44,7 +44,10 @@ class ModxmcpIndexManagerController extends modExtraManagerController {
         $token = (string) $this->modx->getOption('modxmcp.api_token');
         $siteUrl = rtrim((string) $this->modx->getOption('site_url'), '/');
         $assetsUrl = (string) $this->modx->getOption('assets_url', null, '/assets/');
-        if (!preg_match('#^https?://#i', $assetsUrl)) {
+        if (preg_match('#^//#', $assetsUrl)) {
+            $scheme = parse_url($siteUrl, PHP_URL_SCHEME);
+            $assetsUrl = ($scheme ? $scheme : 'https') . ':' . $assetsUrl;
+        } elseif (!preg_match('#^https?://#i', $assetsUrl)) {
             $assetsUrl = $siteUrl . '/' . ltrim($assetsUrl, '/');
         }
         $endpoint = rtrim($assetsUrl, '/') . '/components/modxmcp/api.php';
