@@ -137,6 +137,7 @@ $hadAssets = file_exists($targetAssets) || is_link($targetAssets);
 $coreTouched = false;
 $assetsTouched = false;
 $deployCommitted = false;
+$dbTransactionOpen = false;
 
 $pathExists = static function ($path) {
     return file_exists($path) || is_link($path);
@@ -159,6 +160,7 @@ $restoreTree = static function ($target, $backup, $hadOriginal) use ($removeTree
 
 register_shutdown_function(static function () use (
     &$deployCommitted,
+    &$dbTransactionOpen,
     &$coreTouched,
     &$assetsTouched,
     $targetCore,
@@ -171,10 +173,20 @@ register_shutdown_function(static function () use (
     $hadAssets,
     $restoreTree,
     $removeTree,
-    $pathExists
+    $pathExists,
+    $modx
 ) {
     if ($deployCommitted) {
         return;
+    }
+
+    if ($dbTransactionOpen) {
+        try {
+            $modx->rollback();
+        } catch (Throwable $rollbackError) {
+            fwrite(STDERR, "HEADLESS DB ROLLBACK FAILED: " . $rollbackError->getMessage() . "\n");
+        }
+        $dbTransactionOpen = false;
     }
 
     // Restore assets first, then core, reversing the deployment order.
@@ -238,6 +250,14 @@ try {
     $assetsTouched = true;
 } catch (Throwable $e) {
     fwrite(STDERR, "File deployment failed: " . $e->getMessage() . "\n");
+    exit(1);
+}
+
+try {
+    $modx->beginTransaction();
+    $dbTransactionOpen = true;
+} catch (Throwable $e) {
+    fwrite(STDERR, "Could not start MODX database transaction: " . $e->getMessage() . "\n");
     exit(1);
 }
 
@@ -354,17 +374,30 @@ if ($token === '') {
 }
 
 $enabled = $modx->getObject(modSystemSetting::class, array('key' => 'modxmcp.enabled'));
-if ($enabled && (string) $enabled->get('value') === '') {
+if (!$enabled) {
+    fwrite(STDERR, "Required system setting modxmcp.enabled is missing after installation.\n");
+    exit(1);
+}
+if ((string) $enabled->get('value') === '') {
     $enabled->set('value', 1);
-    $enabled->save();
+    if (!$enabled->save()) {
+        fwrite(STDERR, "Failed to initialize modxmcp.enabled.\n");
+        exit(1);
+    }
 }
 
-if ($modx->getCacheManager()) {
-    $modx->getCacheManager()->refresh();
+try {
+    if ($modx->commit() === false) {
+        throw new RuntimeException('MODX database transaction commit returned false.');
+    }
+    $dbTransactionOpen = false;
+} catch (Throwable $e) {
+    fwrite(STDERR, "Could not commit MODX database transaction: " . $e->getMessage() . "\n");
+    exit(1);
 }
 
-// Everything after the file swap and MODX object writes succeeded. From this point
-// the shutdown handler must not restore the previous component tree.
+// File swap and all MODX object writes are now committed. From this point the
+// shutdown handler must not restore the previous component tree.
 $deployCommitted = true;
 foreach (array($backupCore, $backupAssets, $stageCore, $stageAssets) as $transient) {
     if ($pathExists($transient)) {
@@ -374,6 +407,10 @@ foreach (array($backupCore, $backupAssets, $stageCore, $stageAssets) as $transie
             fwrite(STDERR, "HEADLESS POST-INSTALL CLEANUP WARNING: " . $cleanupError->getMessage() . "\n");
         }
     }
+}
+
+if ($modx->getCacheManager()) {
+    $modx->getCacheManager()->refresh();
 }
 
 $siteUrl = rtrim((string) $modx->getOption('site_url'), '/');
