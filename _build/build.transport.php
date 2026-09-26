@@ -168,7 +168,7 @@ $builder->setPackageAttributes(array(
     'readme'    => file_exists($sources['docs'] . 'README.md') ? file_get_contents($sources['docs'] . 'README.md') : 'MODX3 MCP — MCP endpoint for MODX Revolution 3.',
     'changelog' => file_exists($sources['docs'] . 'CHANGELOG.md') ? file_get_contents($sources['docs'] . 'CHANGELOG.md') : '',
     'requires'  => array(
-        'modx' => '>=3.0.0 <4.0.0',
+        'modx' => '>=3.0.0,<4.0.0',
     ),
 ));
 
