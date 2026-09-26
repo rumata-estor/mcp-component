@@ -201,6 +201,10 @@ for needle, message in {
         fail(message)
 
 builder = (ROOT / "_build/build.transport.php").read_text()
+if "PHP_SAPI !== 'cli'" not in builder:
+    fail("transport builder: must be CLI-only")
+if "$_GET['key']" in builder or "web build requires" in builder:
+    fail("transport builder: API token must never be accepted through a web query string")
 builder_requirements = {
     "registerNamespace(": "transport builder must register namespace",
     "newObject(modMenu::class)": "transport builder must create manager menus",
