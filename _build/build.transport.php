@@ -164,6 +164,10 @@ $modx->log(modX::LOG_LEVEL_INFO, 'Packaged core + assets files and install resol
 
 /* ---- package attributes ---- */
 $builder->setPackageAttributes(array(
+    'requires'  => array(
+        'modx' => '3.*',
+        'php'  => '>=7.4.0',
+    ),
     'license'   => file_exists($sources['docs'] . 'LICENSE') ? file_get_contents($sources['docs'] . 'LICENSE') : 'MIT',
     'readme'    => file_exists($sources['docs'] . 'README.md') ? file_get_contents($sources['docs'] . 'README.md') : 'modxMCP — MCP endpoint for MODX.',
     'changelog' => file_exists($sources['docs'] . 'CHANGELOG.md') ? file_get_contents($sources['docs'] . 'CHANGELOG.md') : '',
