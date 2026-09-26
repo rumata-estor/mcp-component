@@ -37,8 +37,9 @@ if ($action === xPDOTransport::ACTION_INSTALL || $action === xPDOTransport::ACTI
     if ($setting && trim((string) $setting->get('value')) === '') {
         try {
             $token = bin2hex(random_bytes(32));
-        } catch (Exception $e) {
-            $token = md5(uniqid('modxmcp', true)) . md5(uniqid('token', true));
+        } catch (Throwable $e) {
+            $modx->log(modX::LOG_LEVEL_ERROR, '[modxMCP] Secure API token generation failed; installation cannot enable the API safely.');
+            return false;
         }
         $setting->set('value', $token);
         $setting->save();
