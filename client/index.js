@@ -352,8 +352,8 @@ const toolDefinitions = [
       type: "object",
       properties: {
         key: { type: "string" },
-        id: { type: "number" },
       },
+      required: ["key"],
     },
   },
   {
@@ -373,28 +373,28 @@ const toolDefinitions = [
   },
   {
     name: "modx_update_system_setting",
-    description: "Update a MODX system setting.",
+    description: "Update a MODX system setting by key.",
     inputSchema: {
       type: "object",
       properties: {
         key: { type: "string" },
-        id: { type: "number" },
         value: { type: "string" },
         xtype: { type: "string" },
         namespace: { type: "string" },
         area: { type: "string" },
       },
+      required: ["key"],
     },
   },
   {
     name: "modx_delete_system_setting",
-    description: "Delete a MODX system setting.",
+    description: "Delete a MODX system setting by key.",
     inputSchema: {
       type: "object",
       properties: {
         key: { type: "string" },
-        id: { type: "number" },
       },
+      required: ["key"],
     },
   },
   {
