@@ -1,5 +1,6 @@
 <?php
 
+use MODX\Revolution\modMenu;
 use MODX\Revolution\modNamespace;
 use MODX\Revolution\modSystemSetting;
 use MODX\Revolution\modX;
@@ -86,11 +87,43 @@ if ($action === 'uninstall') {
     if (!$ok) {
         exit(1);
     }
-    $package->remove();
+    $leftovers = array();
+
+    if ($modx->getCount(modSystemSetting::class, array('namespace' => 'modxmcp')) > 0) {
+        $leftovers[] = 'modxmcp system settings';
+    }
+    foreach (array('modxmcp_graph', 'modxmcp') as $menuText) {
+        if ($modx->getObject(modMenu::class, array('text' => $menuText))) {
+            $leftovers[] = "manager menu {$menuText}";
+        }
+    }
+    if ($modx->getObject(modNamespace::class, array('name' => 'modxmcp'))) {
+        $leftovers[] = 'modxmcp namespace';
+    }
+
+    $coreDir = rtrim(MODX_CORE_PATH, '/\\') . DIRECTORY_SEPARATOR . 'components' . DIRECTORY_SEPARATOR . 'modxmcp';
+    $assetsDir = rtrim(MODX_ASSETS_PATH, '/\\') . DIRECTORY_SEPARATOR . 'components' . DIRECTORY_SEPARATOR . 'modxmcp';
+    if (file_exists($coreDir)) {
+        $leftovers[] = $coreDir;
+    }
+    if (file_exists($assetsDir)) {
+        $leftovers[] = $assetsDir;
+    }
+
+    if (!empty($leftovers)) {
+        fwrite(STDERR, "Transport uninstall left artifacts:\n - " . implode("\n - ", $leftovers) . "\n");
+        exit(7);
+    }
+
+    if (!$package->remove()) {
+        fwrite(STDERR, "Transport uninstall succeeded, but package record could not be removed.\n");
+        exit(8);
+    }
     if ($modx->getCacheManager()) {
         $modx->getCacheManager()->refresh();
     }
     echo "package record removed\n";
+    echo "TRANSPORT_UNINSTALL_VERIFY_OK\n";
     exit(0);
 }
 
