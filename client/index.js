@@ -1,5 +1,3 @@
-[Reading 1900 lines from start (total: 1900 lines, 0 remaining)]
-
 #!/usr/bin/env node
 
 const { Server } = require("@modelcontextprotocol/sdk/server/index.js");
@@ -1900,5 +1898,3 @@ async function main() {
 }
 
 main().catch(console.error);
-
-[executed on device: 363801.fornex.cloud (8f5f64bb-f348-43b3-8961-b53f304c8ad7)]
