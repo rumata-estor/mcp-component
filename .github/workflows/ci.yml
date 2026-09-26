@@ -26,6 +26,9 @@ jobs:
       - name: Client syntax check
         run: node --check client/index.js
 
+      - name: Release smoke runner shell syntax
+        run: bash -n _build/release.smoke.sh
+
       - name: Release portability / secure defaults
         run: python3 _build/test.release-portability.py
 
