@@ -2,6 +2,7 @@
 
 use MODX\Revolution\modNamespace;
 use MODX\Revolution\modSystemSetting;
+use MODX\Revolution\modUser;
 use MODX\Revolution\modX;
 
 if (PHP_SAPI !== 'cli') {
@@ -49,6 +50,75 @@ $modx = modX::getInstance();
 $modx->initialize('mgr');
 $modx->setLogLevel(modX::LOG_LEVEL_INFO);
 $modx->setLogTarget('ECHO');
+
+$versionData = $modx->getVersionData();
+$modxVersion = isset($versionData['full_version']) ? (string)$versionData['full_version'] : '';
+if ($modxVersion === '' || version_compare($modxVersion, '3.0.0', '<') || version_compare($modxVersion, '4.0.0', '>=')) {
+    fwrite(STDERR, "MODX3 MCP requires MODX Revolution 3.x; detected: " . ($modxVersion !== '' ? $modxVersion : 'unknown') . "\n");
+    exit(2);
+}
+if (version_compare(PHP_VERSION, '7.4.0', '<')) {
+    fwrite(STDERR, "MODX3 MCP requires PHP 7.4 or newer; detected: " . PHP_VERSION . "\n");
+    exit(2);
+}
+
+$requestedServiceUserId = null;
+foreach ($argv as $i => $arg) {
+    if (strpos($arg, '--service-user-id=') === 0) {
+        $requestedServiceUserId = (int)substr($arg, strlen('--service-user-id='));
+        break;
+    }
+    if ($arg === '--service-user-id' && isset($argv[$i + 1])) {
+        $requestedServiceUserId = (int)$argv[$i + 1];
+        break;
+    }
+}
+
+$isUsableServiceUser = static function ($user) {
+    return $user instanceof modUser && (bool)$user->get('active') && (bool)$user->get('sudo');
+};
+
+$resolvedServiceUser = null;
+if ($requestedServiceUserId !== null) {
+    if ($requestedServiceUserId <= 0) {
+        fwrite(STDERR, "--service-user-id must be a positive MODX user ID.\n");
+        exit(2);
+    }
+    $resolvedServiceUser = $modx->getObject(modUser::class, $requestedServiceUserId);
+    if (!$isUsableServiceUser($resolvedServiceUser)) {
+        fwrite(STDERR, "Requested service user must exist, be active and have sudo=1.\n");
+        exit(2);
+    }
+} else {
+    $existingServiceSetting = $modx->getObject(modSystemSetting::class, array('key' => 'modxmcp.service_user_id'));
+    $existingServiceUserId = $existingServiceSetting ? (int)$existingServiceSetting->get('value') : 0;
+    if ($existingServiceUserId > 0) {
+        $existingServiceUser = $modx->getObject(modUser::class, $existingServiceUserId);
+        if ($isUsableServiceUser($existingServiceUser)) {
+            $resolvedServiceUser = $existingServiceUser;
+        }
+    }
+
+    if (!$resolvedServiceUser) {
+        $q = $modx->newQuery(modUser::class);
+        $q->where(array('active' => 1, 'sudo' => 1));
+        $q->sortby('id', 'ASC');
+        $q->limit(2);
+        $sudoUsers = array_values($modx->getCollection(modUser::class, $q));
+        if (count($sudoUsers) === 1 && $isUsableServiceUser($sudoUsers[0])) {
+            $resolvedServiceUser = $sudoUsers[0];
+        }
+    }
+}
+
+if (!$resolvedServiceUser) {
+    fwrite(
+        STDERR,
+        "Cannot choose a service user safely. Re-run with --service-user-id=<ID> for an active sudo MODX user.\n"
+    );
+    exit(2);
+}
+$resolvedServiceUserId = (int)$resolvedServiceUser->get('id');
 
 $sourceCore = $root . 'core/components/modxmcp';
 $sourceAssets = $root . 'assets/components/modxmcp';
@@ -199,10 +269,10 @@ if (!$namespace->save()) {
 $settings = array(
     'modxmcp.enabled' => array(1, 'combo-boolean', 'modxmcp:main'),
     'modxmcp.api_token' => array('', 'textfield', 'modxmcp:main'),
-    'modxmcp.service_user_id' => array(1, 'textfield', 'modxmcp:main'),
+    'modxmcp.service_user_id' => array(0, 'textfield', 'modxmcp:main'),
     'modxmcp.audit_log' => array(1, 'combo-boolean', 'modxmcp:main'),
     'modxmcp.debug' => array(0, 'combo-boolean', 'modxmcp:main'),
-    'modxmcp.auto_static' => array(1, 'combo-boolean', 'modxmcp:main'),
+    'modxmcp.auto_static' => array(0, 'combo-boolean', 'modxmcp:main'),
     'modxmcp.disabled_groups' => array(
         'versionx,virtualpage,minishop2,migx,access,property_sets,contexts,package_management,namespaces,lexicon',
         'textfield',
@@ -212,8 +282,9 @@ $settings = array(
     'modxmcp.max_payload_bytes' => array(1048576, 'textfield', 'modxmcp:limits'),
     'modxmcp.max_read_bytes' => array(262144, 'textfield', 'modxmcp:limits'),
     'modxmcp.allow_root_filesystem_read' => array(0, 'combo-boolean', 'modxmcp:security'),
-    'modxmcp.require_https' => array(0, 'combo-boolean', 'modxmcp:security'),
+    'modxmcp.require_https' => array(1, 'combo-boolean', 'modxmcp:security'),
     'modxmcp.allowed_ips' => array('', 'textfield', 'modxmcp:security'),
+    'modxmcp.trusted_proxy_ips' => array('', 'textfield', 'modxmcp:security'),
     'modxmcp.component_code_roots' => array('core/components,assets/components', 'textfield', 'modxmcp:security'),
     'modxmcp.core_path' => array('{core_path}components/modxmcp/', 'textfield', 'modxmcp:paths'),
 );
@@ -235,6 +306,17 @@ foreach ($settings as $key => $definition) {
     }
 }
 
+$serviceUserSetting = $modx->getObject(modSystemSetting::class, array('key' => 'modxmcp.service_user_id'));
+if (!$serviceUserSetting) {
+    fwrite(STDERR, "Failed to load modxmcp.service_user_id after creating settings.\n");
+    exit(1);
+}
+$serviceUserSetting->set('value', $resolvedServiceUserId);
+if (!$serviceUserSetting->save()) {
+    fwrite(STDERR, "Failed to save modxmcp.service_user_id.\n");
+    exit(1);
+}
+
 $tokenSetting = $modx->getObject(modSystemSetting::class, array('key' => 'modxmcp.api_token'));
 $token = $tokenSetting ? trim((string) $tokenSetting->get('value')) : '';
 $tokenGenerated = false;
@@ -242,7 +324,8 @@ if ($token === '') {
     try {
         $token = bin2hex(random_bytes(32));
     } catch (Throwable $e) {
-        $token = hash('sha256', uniqid('modxmcp', true) . microtime(true));
+        fwrite(STDERR, "Secure API token generation failed; installation aborted.\n");
+        exit(1);
     }
     $tokenSetting->set('value', $token);
     if (!$tokenSetting->save()) {
@@ -281,4 +364,4 @@ if ($showToken) {
     $preview = strlen($token) > 12 ? substr($token, 0, 6) . '...' . substr($token, -4) : '[set]';
     echo "Token: {$preview} (use --show-token to print the full value)\n";
 }
-echo "Variant: modx3\n";
+echo "Service user: #{$resolvedServiceUserId}\n";\necho "Variant: modx3\n";
