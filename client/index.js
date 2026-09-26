@@ -55,6 +55,11 @@ const SITE_ID = process.env.MODX_MCP_SITE_ID || "";
 const MANAGER_ROOT = process.env.MODX_MCP_MANAGER_ROOT || "";
 const BACKUP_KEEP_COUNT = Math.max(1, Number(process.env.MODX_MCP_BACKUP_KEEP_COUNT || 20));
 const SKIP_AUTO_BACKUP = process.env.MODX_MCP_SKIP_AUTO_BACKUP === "1";
+const REQUEST_TIMEOUT_RAW = Number(process.env.MODX_MCP_TIMEOUT_MS || 30000);
+const REQUEST_TIMEOUT_MS =
+  Number.isFinite(REQUEST_TIMEOUT_RAW) && REQUEST_TIMEOUT_RAW >= 1000
+    ? Math.floor(REQUEST_TIMEOUT_RAW)
+    : 30000;
 
 
 const PROJECT_LOCK_READ_ONLY_TOOLS = new Set([
@@ -245,6 +250,7 @@ function noteCaps(caps) {
 async function modxApiRequest(payload) {
   try {
     const response = await axios.post(MODX_SITE_URL, payload, {
+      timeout: REQUEST_TIMEOUT_MS,
       headers: {
         "X-MCP-Token": API_TOKEN,
         "Content-Type": "application/json; charset=utf-8",
