@@ -51,6 +51,17 @@ $modx->initialize('mgr');
 $modx->setLogLevel(modX::LOG_LEVEL_INFO);
 $modx->setLogTarget('ECHO');
 
+$versionData = $modx->getVersionData();
+$modxVersion = isset($versionData['full_version']) ? (string)$versionData['full_version'] : '';
+if ($modxVersion === '' || version_compare($modxVersion, '3.0.0', '<') || version_compare($modxVersion, '4.0.0', '>=')) {
+    fwrite(STDERR, "MODX3 MCP requires MODX Revolution 3.x; detected: " . ($modxVersion !== '' ? $modxVersion : 'unknown') . "\n");
+    exit(2);
+}
+if (version_compare(PHP_VERSION, '7.4.0', '<')) {
+    fwrite(STDERR, "MODX3 MCP requires PHP 7.4 or newer; detected: " . PHP_VERSION . "\n");
+    exit(2);
+}
+
 $requestedServiceUserId = null;
 foreach ($argv as $i => $arg) {
     if (strpos($arg, '--service-user-id=') === 0) {
