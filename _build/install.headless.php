@@ -36,6 +36,12 @@ if (!$config || !is_file($config)) {
     exit(2);
 }
 
+// Some hosting environments leave DOCUMENT_ROOT empty for CLI processes,
+// while config.core.php derives MODX_CORE_PATH from it.
+if (empty($_SERVER['DOCUMENT_ROOT'])) {
+    $_SERVER['DOCUMENT_ROOT'] = dirname($config);
+}
+
 require_once $config;
 require_once MODX_CORE_PATH . 'vendor/autoload.php';
 
