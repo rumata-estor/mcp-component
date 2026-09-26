@@ -4,104 +4,156 @@ use MODX\Revolution\modNamespace;
 use MODX\Revolution\modSystemSetting;
 use MODX\Revolution\modX;
 use MODX\Revolution\Transport\modTransportPackage;
+
 /**
- * CLI-only TEST/DEV helper for installing or uninstalling a locally built transport package.
- * It never prints the API token and never changes modxmcp.enabled.
+ * CLI-only transport-package installer/verifier for release testing.
  *
  * Usage:
- *   php _build/install.transport.php
- *   php _build/install.transport.php --sig=modx3mcp-1.0.0-pl
- *   php _build/install.transport.php --action=uninstall --sig=modx3mcp-1.0.0-pl
+ *   MODX_CONFIG_CORE=/path/config.core.php php _build/install.transport.php
+ *   MODX_CONFIG_CORE=/path/config.core.php php _build/install.transport.php --signature=modx3mcp-1.0.0-pl
+ *   MODX_CONFIG_CORE=/path/config.core.php php _build/install.transport.php --action=uninstall
+ *   ... --show-token
+ *
+ * The transport archive must already exist in MODX_CORE_PATH/packages/.
  */
 if (PHP_SAPI !== 'cli') {
     http_response_code(403);
-    die("Transport verifier is CLI-only.\n");
+    die("Transport test installer is CLI-only.\n");
 }
 
 set_time_limit(0);
 error_reporting(E_ALL & ~E_DEPRECATED & ~E_STRICT);
 
+require_once __DIR__ . '/build.config.php';
+
 $config = getenv('MODX_CONFIG_CORE');
-if (!$config || !file_exists($config)) {
-    $dir = dirname(__FILE__);
+if (!$config || !is_file($config)) {
+    $dir = __DIR__;
     for ($i = 0; $i < 12; $i++) {
-        if (file_exists($dir . '/config.core.php')) { $config = $dir . '/config.core.php'; break; }
-        $parent = dirname($dir); if ($parent === $dir) break; $dir = $parent;
+        $candidate = $dir . DIRECTORY_SEPARATOR . 'config.core.php';
+        if (is_file($candidate)) {
+            $config = $candidate;
+            break;
+        }
+        $parent = dirname($dir);
+        if ($parent === $dir) {
+            break;
+        }
+        $dir = $parent;
     }
 }
-if (!$config) { die("config.core.php not found\n"); }
+if (!$config || !is_file($config)) {
+    fwrite(STDERR, "config.core.php not found; set MODX_CONFIG_CORE.\n");
+    exit(2);
+}
+
 require_once $config;
 require_once MODX_CORE_PATH . 'vendor/autoload.php';
 
 $modx = modX::getInstance();
 $modx->initialize('mgr');
 
-$signature = 'modx3mcp-1.0.0-pl';
-$action = 'install';
-foreach ($argv as $arg) {
-    if (strpos($arg, '--sig=') === 0) {
-        $signature = preg_replace('/[^a-zA-Z0-9._-]/', '', substr($arg, 6));
-    } elseif (strpos($arg, '--action=') === 0) {
-        $action = substr($arg, 9);
+$args = array_slice($argv, 1);
+$options = array();
+foreach ($args as $arg) {
+    if ($arg === '--show-token') {
+        $options['show-token'] = true;
+        continue;
+    }
+    if (strpos($arg, '--') === 0 && strpos($arg, '=') !== false) {
+        list($key, $value) = explode('=', substr($arg, 2), 2);
+        $options[$key] = $value;
     }
 }
+
+$defaultSignature = strtolower(PKG_NAME) . '-' . PKG_VERSION . '-' . PKG_RELEASE;
+$signature = isset($options['signature']) ? preg_replace('/[^a-zA-Z0-9._-]/', '', $options['signature']) : $defaultSignature;
+$action = isset($options['action']) ? strtolower((string)$options['action']) : 'install';
 if (!in_array($action, array('install', 'uninstall'), true)) {
-    fwrite(STDERR, "Invalid --action. Use install or uninstall.\n");
+    fwrite(STDERR, "Unsupported --action. Use install or uninstall.\n");
     exit(2);
 }
 
+$package = $modx->getObject(modTransportPackage::class, array('signature' => $signature));
+
 if ($action === 'uninstall') {
-    $pkg = $modx->getObject(modTransportPackage::class, array('signature' => $signature));
-    if (!$pkg) { echo "no package record for $signature\n"; exit; }
-    $un = $pkg->uninstall();
-    echo 'uninstall(): ' . ($un ? 'OK' : 'FAILED') . "\n";
-    $pkg->remove();
-    $modx->getCacheManager()->refresh();
+    if (!$package) {
+        fwrite(STDERR, "No installed package record for {$signature}.\n");
+        exit(3);
+    }
+    $ok = $package->uninstall();
+    echo 'uninstall(): ' . ($ok ? 'OK' : 'FAILED') . PHP_EOL;
+    if (!$ok) {
+        exit(1);
+    }
+    $package->remove();
+    if ($modx->getCacheManager()) {
+        $modx->getCacheManager()->refresh();
+    }
     echo "package record removed\n";
-    exit;
+    exit(0);
 }
 
-$package = $modx->getObject(modTransportPackage::class, array('signature' => $signature));
+$archive = rtrim(MODX_CORE_PATH, '/\\') . DIRECTORY_SEPARATOR . 'packages' . DIRECTORY_SEPARATOR . $signature . '.transport.zip';
+if (!is_file($archive)) {
+    fwrite(STDERR, "Transport archive not found: {$archive}\n");
+    exit(4);
+}
+
 if (!$package) {
     $package = $modx->newObject(modTransportPackage::class);
     $package->set('signature', $signature);
     $package->set('state', 1);
     $package->set('created', date('Y-m-d H:i:s'));
     $package->set('workspace', 1);
-    $sig = explode('-', $signature);
-    $package->set('package_name', $sig[0]);
-    $vparts = explode('.', isset($sig[1]) ? $sig[1] : '1.0.0');
-    $package->set('version_major', isset($vparts[0]) ? $vparts[0] : 1);
-    $package->set('version_minor', isset($vparts[1]) ? $vparts[1] : 0);
-    $package->set('version_patch', isset($vparts[2]) ? $vparts[2] : 0);
-    if (!empty($sig[2])) {
-        $rel = preg_split('/([0-9]+)/', $sig[2], -1, PREG_SPLIT_DELIM_CAPTURE);
-        $package->set('release', $rel[0]);
-        $package->set('release_index', isset($rel[1]) ? $rel[1] : 0);
+    $package->set('package_name', PKG_NAME);
+    $package->set('version_major', (int)explode('.', PKG_VERSION)[0]);
+    $parts = array_pad(explode('.', PKG_VERSION), 3, 0);
+    $package->set('version_minor', (int)$parts[1]);
+    $package->set('version_patch', (int)$parts[2]);
+    $package->set('release', PKG_RELEASE);
+    $package->set('release_index', 0);
+    if (!$package->save()) {
+        fwrite(STDERR, "Could not create package record for {$signature}.\n");
+        exit(5);
     }
-    $package->save();
     echo "package record created\n";
 } else {
     echo "package record exists\n";
 }
 
 $ok = $package->install();
-echo 'install(): ' . ($ok ? 'OK' : 'FAILED') . "\n";
+echo 'install(): ' . ($ok ? 'OK' : 'FAILED') . PHP_EOL;
+if (!$ok) {
+    exit(1);
+}
 
-$modx->getCacheManager()->refresh();
+if ($modx->getCacheManager()) {
+    $modx->getCacheManager()->refresh();
+}
 
 $ns = $modx->getObject(modNamespace::class, array('name' => 'modxmcp'));
-echo 'namespace modxmcp: ' . ($ns ? 'yes' : 'NO') . "\n";
-echo 'modxmcp.* settings: ' . $modx->getCount(modSystemSetting::class, array('key:LIKE' => 'modxmcp.%')) . "\n";
+$countSettings = $modx->getCount(modSystemSetting::class, array('key:LIKE' => 'modxmcp.%'));
+$tokenSetting = $modx->getObject(modSystemSetting::class, array('key' => 'modxmcp.api_token'));
+$token = $tokenSetting ? trim((string)$tokenSetting->get('value')) : '';
+$enabledSetting = $modx->getObject(modSystemSetting::class, array('key' => 'modxmcp.enabled'));
 
-$token = $modx->getObject(modSystemSetting::class, array('key' => 'modxmcp.api_token'));
-$tv = $token ? (string) $token->get('value') : '';
-echo 'api_token: ' . ($tv !== '' ? ('set, ' . strlen($tv) . ' chars') : 'EMPTY') . "\n";
+echo 'signature: ' . $signature . PHP_EOL;
+echo 'namespace modxmcp: ' . ($ns ? 'yes' : 'NO') . PHP_EOL;
+echo 'modxmcp.* settings: ' . $countSettings . PHP_EOL;
+echo 'enabled: ' . ($enabledSetting ? var_export($enabledSetting->get('value'), true) : 'missing') . PHP_EOL;
+echo 'api_token: ' . ($token !== '' ? ('set, ' . strlen($token) . ' chars') : 'EMPTY') . PHP_EOL;
+if (!empty($options['show-token']) && $token !== '') {
+    echo 'TOKEN=' . $token . PHP_EOL;
+}
+echo 'file assets/api.php: ' . (is_file(MODX_ASSETS_PATH . 'components/modxmcp/api.php') ? 'yes' : 'NO') . PHP_EOL;
+echo 'file core/model: ' . (is_file(MODX_CORE_PATH . 'components/modxmcp/model/modxmcp.class.php') ? 'yes' : 'NO') . PHP_EOL;
 
-$en = $modx->getObject(modSystemSetting::class, array('key' => 'modxmcp.enabled'));
-echo 'enabled (default): ' . ($en ? var_export($en->get('value'), true) : '?') . "\n";
+if (!$ns || $countSettings < 1 || $token === '' ||
+    !is_file(MODX_ASSETS_PATH . 'components/modxmcp/api.php') ||
+    !is_file(MODX_CORE_PATH . 'components/modxmcp/model/modxmcp.class.php')) {
+    fwrite(STDERR, "Transport verification FAILED.\n");
+    exit(6);
+}
 
-echo 'file assets/.../api.php: ' . (file_exists(MODX_ASSETS_PATH . 'components/modxmcp/api.php') ? 'yes' : 'NO') . "\n";
-echo 'file core/.../modxmcp.class.php: ' . (file_exists(MODX_CORE_PATH . 'components/modxmcp/model/modxmcp.class.php') ? 'yes' : 'NO') . "\n";
-
-echo "Token value is intentionally not printed by this verifier.\n";
+echo "TRANSPORT_VERIFY_OK\n";
