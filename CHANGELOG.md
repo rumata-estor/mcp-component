@@ -18,6 +18,7 @@
 - Headless deployment переведён на staged core/assets trees с directory swap и rollback предыдущих trees при ошибке; runtime audit log сохраняется между обновлениями.
 - Transport uninstall удаляет оба Manager menu, `modxmcp.*` settings, namespace и component files; CLI release verifier проверяет отсутствие leftovers перед удалением package record.
 - Transport/headless parity test сравнивает все 16 `modxmcp.*` definitions целиком: default value, xtype и area.
+- Transport builder переведён в CLI-only режим; API token больше не принимается через query string, чтобы исключить утечку секрета через URL/access logs/browser history.
 - Endpoint hardening: HTTPS enforcement выполняется до health GET; `Content-Length` проверяется до чтения request body, фактический размер — после чтения; transaction helper откатывает на любом `Throwable`.
 - `service_user_id=0` выбирает только active+sudo пользователя; явно заданный service user также обязан уже быть active+sudo.
 - Добавлены серверные `list_tv_values` / `clear_tv_values` для безопасной работы с явно сохранёнными TV values; destructive clear требует confirm и клиент делает safety backup.
