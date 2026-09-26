@@ -70,7 +70,15 @@ if (isset($modx->user) && $isUsable($modx->user) && (int)$modx->user->get('id') 
 if ($candidate) {
     $candidateId = (int)$candidate->get('id');
     $setting->set('value', $candidateId);
-    $setting->save();
+    if (!$setting->save()) {
+        $modx->log(modX::LOG_LEVEL_ERROR, '[MODX3 MCP] Could not save modxmcp.service_user_id; the API cannot be enabled safely.');
+        $enabled = $modx->getObject(modSystemSetting::class, array('key' => 'modxmcp.enabled'));
+        if ($enabled) {
+            $enabled->set('value', 0);
+            $enabled->save();
+        }
+        return false;
+    }
     $modx->log(modX::LOG_LEVEL_INFO, '[modxMCP] service_user_id configured automatically: user #' . $candidateId . '.');
     if ($modx->getCacheManager()) {
         $modx->getCacheManager()->refresh();
@@ -79,11 +87,16 @@ if ($candidate) {
 }
 
 $setting->set('value', 0);
-$setting->save();
+if (!$setting->save()) {
+    $modx->log(modX::LOG_LEVEL_ERROR, '[MODX3 MCP] Could not clear an unusable modxmcp.service_user_id.');
+}
 $enabled = $modx->getObject(modSystemSetting::class, array('key' => 'modxmcp.enabled'));
 if ($enabled) {
     $enabled->set('value', 0);
-    $enabled->save();
+    if (!$enabled->save()) {
+        $modx->log(modX::LOG_LEVEL_ERROR, '[MODX3 MCP] Failed to persist modxmcp.enabled=0 while failing closed.');
+        return false;
+    }
 }
 $modx->log(
     modX::LOG_LEVEL_WARN,
