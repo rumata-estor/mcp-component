@@ -1,4 +1,6 @@
 <?php
+
+use MODX\Revolution\modExtraManagerController;
 /**
  * modxMCP — dependency graph screen (Components > modxMCP > Граф связей).
  *

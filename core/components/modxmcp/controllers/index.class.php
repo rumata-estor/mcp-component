@@ -1,4 +1,6 @@
 <?php
+
+use MODX\Revolution\modExtraManagerController;
 /**
  * modxMCP — manager CMP controller (Components > modxMCP).
  *

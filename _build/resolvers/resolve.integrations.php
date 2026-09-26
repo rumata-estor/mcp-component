@@ -1,4 +1,9 @@
 <?php
+
+use MODX\Revolution\modNamespace;
+use MODX\Revolution\modX;
+use xPDO\Transport\xPDOTransport;
+use xPDO\xPDO;
 /**
  * Resolver: on install/upgrade, log which popular MODX add-ons are present and which
  * are missing, so the operator knows what modxMCP can additionally manage. Purely
@@ -35,7 +40,7 @@ if ($action === xPDOTransport::ACTION_INSTALL || $action === xPDOTransport::ACTI
     );
     $present = array();
     foreach ($known as $ns => $label) {
-        if ($modx->getObject('modNamespace', array('name' => $ns))) {
+        if ($modx->getObject(modNamespace::class, array('name' => $ns))) {
             $present[] = $label;
         }
     }

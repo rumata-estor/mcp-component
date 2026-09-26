@@ -1,9 +1,12 @@
 <?php
+
+use MODX\Revolution\Processors\Processor;
+use MODX\Revolution\modSystemSetting;
 /**
  * Manager processor: save the modxmcp.disabled_groups setting from the CMP capability toggles.
  * Accepts a CSV `disabled` of group keys; only known toggleable keys are stored.
  */
-class ModxmcpSaveGroupsProcessor extends modProcessor {
+class ModxmcpSaveGroupsProcessor extends Processor {
     public function checkPermissions() {
         return $this->modx->hasPermission('settings');
     }
@@ -34,9 +37,9 @@ class ModxmcpSaveGroupsProcessor extends modProcessor {
         }
         $value = implode(',', array_values($disabled));
 
-        $setting = $this->modx->getObject('modSystemSetting', array('key' => 'modxmcp.disabled_groups'));
+        $setting = $this->modx->getObject(modSystemSetting::class, array('key' => 'modxmcp.disabled_groups'));
         if (!$setting) {
-            $setting = $this->modx->newObject('modSystemSetting');
+            $setting = $this->modx->newObject(modSystemSetting::class);
             $setting->fromArray(array(
                 'key'       => 'modxmcp.disabled_groups',
                 'namespace' => 'modxmcp',
@@ -53,7 +56,7 @@ class ModxmcpSaveGroupsProcessor extends modProcessor {
         if ($this->modx->getCacheManager()) {
             $this->modx->getCacheManager()->refresh();
         }
-        $this->modx->logManagerAction('modxmcp_save_groups', 'modSystemSetting', 'modxmcp.disabled_groups');
+        $this->modx->logManagerAction('modxmcp_save_groups', modSystemSetting::class, 'modxmcp.disabled_groups');
 
         return $this->success('', array('disabled_groups' => $value));
     }

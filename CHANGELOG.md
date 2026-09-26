@@ -1,3 +1,18 @@
+# MODX 3 fork notes
+
+- Added CLI-only headless install/update (`_build/install.headless.php`) as the recommended MODX 3 deployment path: no Package Manager record and no manager menu are created; files, namespace, settings, token and cache refresh are handled directly.
+The `modx3` branch ports modxMCP 1.9.0 to native MODX Revolution 3 APIs while keeping the MCP action surface compatible.
+
+- Native MODX 3 bootstrap via Composer and `modX::getInstance()`.
+- Core MODX/xPDO model identifiers use FQCN class constants instead of MODX 2 aliases.
+- Core processors are resolved to exact MODX 3 PSR-4 classes, including compound names such as `GetList`, `EmptyRecycleBin`, `RefreshUris`, `TemplateVar`, and `PackageNamespace`.
+- Missing `Security/Group/Get` route replaced with direct xPDO lookup.
+- Legacy model class names supplied at API boundaries are normalized to MODX 3 FQCNs.
+- MODX 3 media-source folder deletion uses relative paths as required since MODX 3.
+- Manager processors/controllers and transport build/install code use namespaced MODX 3 classes.
+- Transport package is named `modxMCP3` while retaining the `modxmcp` component namespace.
+- Processor compatibility is checked against MODX `v3.2.2-pl` and current `3.x`.
+
 # Changelog
 
 ## 1.9.0 (2026-08-10)

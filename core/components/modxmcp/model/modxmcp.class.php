@@ -1,32 +1,40 @@
 <?php
+
+use MODX\Revolution\modX;
 if (!class_exists("ModxMCPClientException")) {
     /** Expected/validation error whose message is safe to return to the client. */
     class ModxMCPClientException extends Exception {}
 }
 class modxMCP {
     const VERSION = '1.9.0';
+    const VARIANT = 'modx3';
     public $modx;
     public $config =[];
     private $actionSpecsCache = null;
     private $allowedElementTypes = ['chunk', 'snippet', 'template', 'resource', 'tv', 'category', 'plugin'];
     private $versionXTypes = [
-        'resource' => ['class' => 'vxResource', 'processor' => 'resources', 'label' => 'title', 'content_class' => 'modResource'],
-        'chunk' => ['class' => 'vxChunk', 'processor' => 'chunks', 'label' => 'name', 'content_class' => 'modChunk'],
-        'snippet' => ['class' => 'vxSnippet', 'processor' => 'snippets', 'label' => 'name', 'content_class' => 'modSnippet'],
-        'template' => ['class' => 'vxTemplate', 'processor' => 'templates', 'label' => 'templatename', 'content_class' => 'modTemplate'],
-        'plugin' => ['class' => 'vxPlugin', 'processor' => 'plugins', 'label' => 'name', 'content_class' => 'modPlugin'],
-        'tv' => ['class' => 'vxTemplateVar', 'processor' => 'templatevars', 'label' => 'name', 'content_class' => 'modTemplateVar'],
+        'resource' => ['class' => 'vxResource', 'processor' => 'resources', 'label' => 'title', 'content_class' => \MODX\Revolution\modResource::class],
+        'chunk' => ['class' => 'vxChunk', 'processor' => 'chunks', 'label' => 'name', 'content_class' => \MODX\Revolution\modChunk::class],
+        'snippet' => ['class' => 'vxSnippet', 'processor' => 'snippets', 'label' => 'name', 'content_class' => \MODX\Revolution\modSnippet::class],
+        'template' => ['class' => 'vxTemplate', 'processor' => 'templates', 'label' => 'templatename', 'content_class' => \MODX\Revolution\modTemplate::class],
+        'plugin' => ['class' => 'vxPlugin', 'processor' => 'plugins', 'label' => 'name', 'content_class' => \MODX\Revolution\modPlugin::class],
+        'tv' => ['class' => 'vxTemplateVar', 'processor' => 'templatevars', 'label' => 'name', 'content_class' => \MODX\Revolution\modTemplateVar::class],
     ];
 
     public function __construct(modX &$modx, array $config =[]) {
         $this->modx =& $modx;
         $corePath = $this->modx->getOption('modxmcp.core_path', $config, $this->modx->getOption('core_path') . 'components/modxmcp/');
+        $corePath = str_replace(
+            array('{core_path}', '[[++core_path]]'),
+            rtrim((string) $this->modx->getOption('core_path'), '/\\') . DIRECTORY_SEPARATOR,
+            (string) $corePath
+        );
         $this->config = array_merge(['corePath' => $corePath], $config);
     }
 
     public function processRequest($action, $elementType, $data =[]) {
         $serviceUserId = (int)$this->modx->getOption('modxmcp.service_user_id', null, 1);
-        $serviceUser = $this->modx->getObject('modUser', ['id' => $serviceUserId]);
+        $serviceUser = $this->modx->getObject(\MODX\Revolution\modUser::class, ['id' => $serviceUserId]);
         if (!$serviceUser) {
             throw new ModxMCPClientException("Service user not found: {$serviceUserId}.");
         }
@@ -113,8 +121,8 @@ class modxMCP {
                 $limit = isset($data['limit']) ? max(0, (int) $data['limit']) : 100;
                 $start = isset($data['start']) ? max(0, (int) $data['start']) : 0;
                 $listClassMap = [
-                    'chunk' => 'modChunk', 'snippet' => 'modSnippet', 'template' => 'modTemplate',
-                    'resource' => 'modResource', 'tv' => 'modTemplateVar', 'category' => 'modCategory', 'plugin' => 'modPlugin',
+                    'chunk' => \MODX\Revolution\modChunk::class, 'snippet' => \MODX\Revolution\modSnippet::class, 'template' => \MODX\Revolution\modTemplate::class,
+                    'resource' => \MODX\Revolution\modResource::class, 'tv' => \MODX\Revolution\modTemplateVar::class, 'category' => \MODX\Revolution\modCategory::class, 'plugin' => \MODX\Revolution\modPlugin::class,
                 ];
                 $listClass = $listClassMap[$elementType];
                 $lc = $this->modx->newQuery($listClass);
@@ -139,7 +147,7 @@ class modxMCP {
 
             case 'get_element':
                 if (empty($data['id'])) throw new ModxMCPClientException("{$elementType} not found by name or ID is missing.");
-                $response = $this->modx->runProcessor($basePath . 'get',['id' => $data['id']]);
+                $response = $this->runCoreProcessor($basePath . 'get',['id' => $data['id']]);
                 if ($response->isError()) throw new ModxMCPClientException($this->formatProcessorErrors($response));
                 
                 $objData = $response->getObject();
@@ -157,7 +165,7 @@ class modxMCP {
             case 'update_element':
                 if (empty($data['id'])) throw new ModxMCPClientException("{$elementType} not found by name or ID is missing.");
                 
-                $currentResponse = $this->modx->runProcessor($basePath . 'get',['id' => $data['id']]);
+                $currentResponse = $this->runCoreProcessor($basePath . 'get',['id' => $data['id']]);
                 if ($currentResponse->isError()) throw new ModxMCPClientException($this->formatProcessorErrors($currentResponse));
                 
                 $currentData = $currentResponse->getObject();
@@ -167,7 +175,7 @@ class modxMCP {
                 $updateData = $this->filterProcessorData($elementType, $updateData);
                 
                 return $this->runWithTransaction(function () use ($basePath, $updateData, $elementType, $data) {
-                    $response = $this->modx->runProcessor($basePath . 'update', $updateData);
+                    $response = $this->runCoreProcessor($basePath . 'update', $updateData);
                     if ($response->isError()) throw new ModxMCPClientException("Update failed: " . $this->formatProcessorErrors($response));
                     
                     if ($elementType === 'tv') $this->handleTvRelations($data['id'], $data);
@@ -185,7 +193,7 @@ class modxMCP {
                 $createData = $this->filterProcessorData($elementType, $createData);
 
                 return $this->runWithTransaction(function () use ($basePath, $createData, $elementType, $data) {
-                    $response = $this->modx->runProcessor($basePath . 'create', $createData);
+                    $response = $this->runCoreProcessor($basePath . 'create', $createData);
                     if ($response->isError()) throw new ModxMCPClientException("Create failed: " . $this->formatProcessorErrors($response));
                     
                     $newObj = $response->getObject();
@@ -209,7 +217,7 @@ class modxMCP {
                 }
 
                 $processorAction = ($elementType === 'resource') ? 'delete' : 'remove';
-                $response = $this->modx->runProcessor($basePath . $processorAction, ['id' => $data['id']]);
+                $response = $this->runCoreProcessor($basePath . $processorAction, ['id' => $data['id']]);
                 if ($response->isError()) throw new ModxMCPClientException("Delete failed: " . $this->formatProcessorErrors($response));
                 
                 $this->modx->cacheManager->refresh();
@@ -257,6 +265,8 @@ class modxMCP {
             'resource_tvs' => array(
                 'get_resource_tvs'    => 'getResourceTvs',
                 'update_resource_tvs' => 'updateResourceTvs',
+                'list_tv_values'      => 'listTvValues',
+                'clear_tv_values'     => 'clearTvValues',
             ),
             'tv_inputs' => array(
                 'list_tv_input_types' => array('m' => 'listTvInputTypes', 'call' => 'bare'),
@@ -359,7 +369,7 @@ class modxMCP {
                 'update_user'  => array('proc' => 'security/user/update', 'via' => 'acl'),
                 'delete_user'  => array('proc' => 'security/user/delete', 'via' => 'acl'),
                 'list_user_groups'        => array('proc' => 'security/group/getlist', 'list' => true, 'via' => 'acl'),
-                'get_user_group'          => array('proc' => 'security/group/get', 'via' => 'acl'),
+                'get_user_group'          => 'getUserGroup',
                 'create_user_group'       => array('proc' => 'security/group/create', 'via' => 'acl'),
                 'update_user_group'       => array('proc' => 'security/group/update', 'via' => 'acl'),
                 'delete_user_group'       => array('proc' => 'security/group/remove', 'via' => 'acl'),
@@ -499,6 +509,100 @@ class modxMCP {
         throw new ModxMCPClientException("Unhandled action spec for action '{$action}'.");
     }
 
+    /**
+     * Normalize legacy MODX 2 model identifiers supplied by callers to MODX 3 FQCNs.
+     * Friendly aliases are handled by the individual action before/after this helper.
+     */
+    private function normalizeCoreModelClass($class) {
+        $class = trim((string) $class);
+        if ($class === '' || strpos($class, 'MODX\\Revolution\\') === 0 || strpos($class, 'xPDO\\') === 0) {
+            return $class;
+        }
+
+        $map = array(
+            'modresource' => \MODX\Revolution\modResource::class,
+            'modchunk' => \MODX\Revolution\modChunk::class,
+            'modsnippet' => \MODX\Revolution\modSnippet::class,
+            'modtemplate' => \MODX\Revolution\modTemplate::class,
+            'modtemplatevar' => \MODX\Revolution\modTemplateVar::class,
+            'modplugin' => \MODX\Revolution\modPlugin::class,
+            'modcategory' => \MODX\Revolution\modCategory::class,
+            'moduser' => \MODX\Revolution\modUser::class,
+            'modusergroup' => \MODX\Revolution\modUserGroup::class,
+            'modcontext' => \MODX\Revolution\modContext::class,
+            'modsystemsetting' => \MODX\Revolution\modSystemSetting::class,
+            'modpropertyset' => \MODX\Revolution\modPropertySet::class,
+            'modelementpropertyset' => \MODX\Revolution\modElementPropertySet::class,
+            'modnamespace' => \MODX\Revolution\modNamespace::class,
+            'sources.modmediasource' => \MODX\Revolution\Sources\modMediaSource::class,
+            'sources.modfilemediasource' => \MODX\Revolution\Sources\modFileMediaSource::class,
+            'sources.modmediasourceelement' => \MODX\Revolution\Sources\modMediaSourceElement::class,
+            'transport.modtransportpackage' => \MODX\Revolution\Transport\modTransportPackage::class,
+            'transport.modtransportprovider' => \MODX\Revolution\Transport\modTransportProvider::class,
+        );
+
+        $key = strtolower($class);
+        return isset($map[$key]) ? $map[$key] : $class;
+    }
+
+    /**
+     * Resolve a legacy MODX core processor path to its MODX 3 PSR-4 class.
+     * This intentionally avoids MODX 2 deprecated global aliases and legacy
+     * processor-path guessing, which may disappear in later MODX 3 releases.
+     */
+    private function coreProcessorClass($processor) {
+        $processor = ltrim((string) $processor, '\\');
+        if (strpos($processor, 'MODX\\Revolution\\Processors\\') === 0) {
+            return $processor;
+        }
+
+        $path = trim(str_replace('\\', '/', $processor), '/');
+        if ($path === '') {
+            throw new ModxMCPClientException('Empty MODX core processor path.');
+        }
+
+        if (strpos($path, 'workspace/namespace/') === 0) {
+            $path = 'workspace/package_namespace/' . substr($path, strlen('workspace/namespace/'));
+        } elseif (strpos($path, 'element/tv/') === 0) {
+            $path = 'element/template_var/' . substr($path, strlen('element/tv/'));
+        }
+
+        $nameMap = array(
+            'package_namespace' => 'PackageNamespace',
+            'template_var'      => 'TemplateVar',
+            'resourcegroup'     => 'ResourceGroup',
+            'usergroup'         => 'UserGroup',
+            'getlist'           => 'GetList',
+            'getnodes'          => 'GetNodes',
+            'getinfo'           => 'GetInfo',
+            'emptyrecyclebin'   => 'EmptyRecycleBin',
+            'refreshuris'       => 'RefreshUris',
+            'remove_locks'      => 'RemoveLocks',
+            'removeresource'    => 'RemoveResource',
+            'updateresourcesin' => 'UpdateResourcesIn',
+        );
+
+        $parts = explode('/', $path);
+        foreach ($parts as &$part) {
+            $key = strtolower($part);
+            $part = isset($nameMap[$key]) ? $nameMap[$key] : ucfirst($part);
+        }
+        unset($part);
+
+        $class = 'MODX\\Revolution\\Processors\\' . implode('\\', $parts);
+        if (!class_exists($class)) {
+            throw new ModxMCPClientException(
+                "MODX 3 core processor class not found: {$class} (legacy path: {$processor})."
+            );
+        }
+        return $class;
+    }
+
+    /** Run a MODX core processor by its real MODX 3 class name. */
+    private function runCoreProcessor($processor, array $properties = array(), array $options = array()) {
+        return $this->modx->runProcessor($this->coreProcessorClass($processor), $properties, $options);
+    }
+
     /** Derive an action => {processor,list} map for one dispatch route ('acl'|'context'|'workspace'). */
     private function procMapFor($via) {
         $out = array();
@@ -522,13 +626,13 @@ class modxMCP {
         if (!is_array($events)) return;
         
         $pluginId = (int)$pluginId;
-        $this->modx->removeCollection('modPluginEvent', ['pluginid' => $pluginId]);
+        $this->modx->removeCollection(\MODX\Revolution\modPluginEvent::class, ['pluginid' => $pluginId]);
         
         foreach ($events as $eventName) {
             $eventName = trim($eventName);
             if (empty($eventName)) continue;
-            if ($this->modx->getObject('modEvent',['name' => $eventName])) {
-                $pe = $this->modx->newObject('modPluginEvent');
+            if ($this->modx->getObject(\MODX\Revolution\modEvent::class,['name' => $eventName])) {
+                $pe = $this->modx->newObject(\MODX\Revolution\modPluginEvent::class);
                 $pe->fromArray(['pluginid' => $pluginId, 'event' => $eventName, 'priority' => 0, 'propertyset' => 0], '', true, true);
                 $pe->save();
             }
@@ -536,21 +640,21 @@ class modxMCP {
     }
 
     private function getPluginEvents($pluginId) {
-        $pes = $this->modx->getCollection('modPluginEvent',['pluginid' => $pluginId]);
+        $pes = $this->modx->getCollection(\MODX\Revolution\modPluginEvent::class,['pluginid' => $pluginId]);
         $res =[];
         foreach($pes as $p) $res[] = $p->get('event');
         return $res;
     }
 
     private function handleTvRelations($tvId, $data) {
-        $tv = $this->modx->getObject('modTemplateVar', $tvId);
+        $tv = $this->modx->getObject(\MODX\Revolution\modTemplateVar::class, $tvId);
         if (!$tv) return;
 
         if (isset($data['templates']) && is_array($data['templates'])) {
-            $this->modx->removeCollection('modTemplateVarTemplate', ['tmplvarid' => $tvId]);
+            $this->modx->removeCollection(\MODX\Revolution\modTemplateVarTemplate::class, ['tmplvarid' => $tvId]);
             foreach ($data['templates'] as $tplId) {
                 if (empty($tplId)) continue;
-                $tvt = $this->modx->newObject('modTemplateVarTemplate');
+                $tvt = $this->modx->newObject(\MODX\Revolution\modTemplateVarTemplate::class);
                 $tvt->fromArray(['tmplvarid' => $tvId, 'templateid' => $tplId], '', true, true);
                 $tvt->save();
             }
@@ -563,12 +667,12 @@ class modxMCP {
 
         if (isset($data['media_source'])) {
             $sourceId = (int)$data['media_source'];
-            $sourceEl = $this->modx->getObject('sources.modMediaSourceElement',[
-                'object' => $tvId, 'object_class' => 'modTemplateVar', 'context_key' => 'web'
+            $sourceEl = $this->modx->getObject(\MODX\Revolution\Sources\modMediaSourceElement::class,[
+                'object' => $tvId, 'object_class' => \MODX\Revolution\modTemplateVar::class, 'context_key' => 'web'
             ]);
             if (!$sourceEl) {
-                $sourceEl = $this->modx->newObject('sources.modMediaSourceElement');
-                $sourceEl->fromArray(['object' => $tvId, 'object_class' => 'modTemplateVar', 'context_key' => 'web'], '', true, true);
+                $sourceEl = $this->modx->newObject(\MODX\Revolution\Sources\modMediaSourceElement::class);
+                $sourceEl->fromArray(['object' => $tvId, 'object_class' => \MODX\Revolution\modTemplateVar::class, 'context_key' => 'web'], '', true, true);
             }
             $sourceEl->set('source', $sourceId);
             $sourceEl->save();
@@ -576,7 +680,7 @@ class modxMCP {
     }
 
     private function getTvTemplates($tvId) {
-        $tvts = $this->modx->getCollection('modTemplateVarTemplate',['tmplvarid' => $tvId]);
+        $tvts = $this->modx->getCollection(\MODX\Revolution\modTemplateVarTemplate::class,['tmplvarid' => $tvId]);
         $res =[];
         foreach($tvts as $t) $res[] = $t->get('templateid');
         return $res;
@@ -584,17 +688,17 @@ class modxMCP {
 
     private function resolveIdByName($elementType, $name) {
         $classMap =[
-            'chunk'    =>['class' => 'modChunk', 'field' => 'name'],
-            'snippet'  =>['class' => 'modSnippet', 'field' => 'name'],
-            'template' =>['class' => 'modTemplate', 'field' => 'templatename'],
-            'resource' =>['class' => 'modResource', 'field' => 'pagetitle'],
-            'tv'       =>['class' => 'modTemplateVar', 'field' => 'name'],
-            'category' =>['class' => 'modCategory', 'field' => 'category'],
-            'plugin'   =>['class' => 'modPlugin', 'field' => 'name']
+            'chunk'    =>['class' => \MODX\Revolution\modChunk::class, 'field' => 'name'],
+            'snippet'  =>['class' => \MODX\Revolution\modSnippet::class, 'field' => 'name'],
+            'template' =>['class' => \MODX\Revolution\modTemplate::class, 'field' => 'templatename'],
+            'resource' =>['class' => \MODX\Revolution\modResource::class, 'field' => 'pagetitle'],
+            'tv'       =>['class' => \MODX\Revolution\modTemplateVar::class, 'field' => 'name'],
+            'category' =>['class' => \MODX\Revolution\modCategory::class, 'field' => 'category'],
+            'plugin'   =>['class' => \MODX\Revolution\modPlugin::class, 'field' => 'name']
         ];
         if ($elementType === 'resource') {
             foreach (['alias', 'uri', 'pagetitle'] as $field) {
-                $obj = $this->modx->getObject('modResource', [$field => $name]);
+                $obj = $this->modx->getObject(\MODX\Revolution\modResource::class, [$field => $name]);
                 if ($obj) {
                     return $obj->get('id');
                 }
@@ -632,12 +736,12 @@ class modxMCP {
         $caseSensitive = !empty($data['case_sensitive']);
 
         $map = array(
-            'chunk'    => array('class' => 'modChunk',       'content' => 'snippet',    'name' => 'name'),
-            'snippet'  => array('class' => 'modSnippet',     'content' => 'snippet',    'name' => 'name'),
-            'template' => array('class' => 'modTemplate',    'content' => 'content',    'name' => 'templatename'),
-            'plugin'   => array('class' => 'modPlugin',      'content' => 'plugincode', 'name' => 'name'),
-            'tv'       => array('class' => 'modTemplateVar', 'content' => 'default_text','name' => 'name'),
-            'resource' => array('class' => 'modResource',    'content' => 'content',    'name' => 'pagetitle'),
+            'chunk'    => array('class' => \MODX\Revolution\modChunk::class,       'content' => 'snippet',    'name' => 'name'),
+            'snippet'  => array('class' => \MODX\Revolution\modSnippet::class,     'content' => 'snippet',    'name' => 'name'),
+            'template' => array('class' => \MODX\Revolution\modTemplate::class,    'content' => 'content',    'name' => 'templatename'),
+            'plugin'   => array('class' => \MODX\Revolution\modPlugin::class,      'content' => 'plugincode', 'name' => 'name'),
+            'tv'       => array('class' => \MODX\Revolution\modTemplateVar::class, 'content' => 'default_text','name' => 'name'),
+            'resource' => array('class' => \MODX\Revolution\modResource::class,    'content' => 'content',    'name' => 'pagetitle'),
         );
 
         $types = (isset($data['types']) && is_array($data['types']) && !empty($data['types']))
@@ -733,7 +837,7 @@ class modxMCP {
         if ($limit > 500) { $limit = 500; }
         $start = isset($data['start']) ? max(0, (int) $data['start']) : 0;
 
-        $c = $this->modx->newQuery('modResource');
+        $c = $this->modx->newQuery(\MODX\Revolution\modResource::class);
         $and = array();
         if (isset($data['parent']) && $data['parent'] !== '') { $and['parent'] = (int) $data['parent']; }
         if (!empty($data['context'])) { $and['context_key'] = (string) $data['context']; }
@@ -746,13 +850,13 @@ class modxMCP {
                 'OR:uri:LIKE' => '%' . $q . '%',
             )));
         }
-        $total = $this->modx->getCount('modResource', $c);
+        $total = $this->modx->getCount(\MODX\Revolution\modResource::class, $c);
         $c->sortby('parent', 'ASC');
         $c->sortby('menuindex', 'ASC');
         $c->limit($limit, $start);
 
         $rows = array();
-        foreach ($this->modx->getCollection('modResource', $c) as $r) {
+        foreach ($this->modx->getCollection(\MODX\Revolution\modResource::class, $c) as $r) {
             $rows[] = array(
                 'id' => (int) $r->get('id'),
                 'pagetitle' => $r->get('pagetitle'),
@@ -761,6 +865,9 @@ class modxMCP {
                 'parent' => (int) $r->get('parent'),
                 'template' => (int) $r->get('template'),
                 'published' => (bool) $r->get('published'),
+                'deleted' => (bool) $r->get('deleted'),
+                'deletedon' => (int) $r->get('deletedon'),
+                'deletedby' => (int) $r->get('deletedby'),
                 'isfolder' => (bool) $r->get('isfolder'),
                 'class_key' => $r->get('class_key'),
                 'context_key' => $r->get('context_key'),
@@ -786,13 +893,13 @@ class modxMCP {
 
         // Template usage: resources whose template is the one named $name.
         $templateResources = array();
-        $tpl = $this->modx->getObject('modTemplate', array('templatename' => $name));
+        $tpl = $this->modx->getObject(\MODX\Revolution\modTemplate::class, array('templatename' => $name));
         if ($tpl) {
             $tid = (int) $tpl->get('id');
-            $rc = $this->modx->newQuery('modResource', array('template' => $tid));
-            $resTotal = $this->modx->getCount('modResource', $rc);
+            $rc = $this->modx->newQuery(\MODX\Revolution\modResource::class, array('template' => $tid));
+            $resTotal = $this->modx->getCount(\MODX\Revolution\modResource::class, $rc);
             $rc->limit($limit);
-            foreach ($this->modx->getCollection('modResource', $rc) as $r) {
+            foreach ($this->modx->getCollection(\MODX\Revolution\modResource::class, $rc) as $r) {
                 $templateResources[] = array('id' => (int) $r->get('id'), 'pagetitle' => $r->get('pagetitle'), 'uri' => $r->get('uri'));
             }
             return array(
@@ -833,18 +940,18 @@ class modxMCP {
         $withRes  = !empty($data['include_resources']);
 
         $elementTypes = array(
-            'template' => array('class' => 'modTemplate',    'name' => 'templatename', 'content' => 'content'),
-            'chunk'    => array('class' => 'modChunk',       'name' => 'name',         'content' => 'snippet'),
-            'snippet'  => array('class' => 'modSnippet',     'name' => 'name',         'content' => 'snippet'),
-            'tv'       => array('class' => 'modTemplateVar', 'name' => 'name',         'content' => 'default_text'),
-            'plugin'   => array('class' => 'modPlugin',      'name' => 'name',         'content' => 'plugincode'),
+            'template' => array('class' => \MODX\Revolution\modTemplate::class,    'name' => 'templatename', 'content' => 'content'),
+            'chunk'    => array('class' => \MODX\Revolution\modChunk::class,       'name' => 'name',         'content' => 'snippet'),
+            'snippet'  => array('class' => \MODX\Revolution\modSnippet::class,     'name' => 'name',         'content' => 'snippet'),
+            'tv'       => array('class' => \MODX\Revolution\modTemplateVar::class, 'name' => 'name',         'content' => 'default_text'),
+            'plugin'   => array('class' => \MODX\Revolution\modPlugin::class,      'name' => 'name',         'content' => 'plugincode'),
         );
 
         $categories = array();
         $catParent  = array();
-        $cq = $this->modx->newQuery('modCategory');
+        $cq = $this->modx->newQuery(\MODX\Revolution\modCategory::class);
         $cq->select(array('id', 'category', 'parent'));
-        foreach ($this->modx->getCollection('modCategory', $cq) as $c) {
+        foreach ($this->modx->getCollection(\MODX\Revolution\modCategory::class, $cq) as $c) {
             $categories[(int) $c->get('id')] = (string) $c->get('category');
             $catParent[(int) $c->get('id')] = (int) $c->get('parent');
         }
@@ -854,7 +961,7 @@ class modxMCP {
         // namespace (MIGX, pdoTools, miniShop2 …), so match categories — and their descendants —
         // against installed namespaces. Lets the UI hide vendor noise; nothing is filtered here.
         $nsNames = array();
-        foreach ($this->modx->getCollection('modNamespace') as $ns) {
+        foreach ($this->modx->getCollection(\MODX\Revolution\modNamespace::class) as $ns) {
             $k = strtolower(preg_replace('/[^a-z0-9]/i', '', (string) $ns->get('name')));
             if ($k !== '' && $k !== 'core') { $nsNames[$k] = true; }
         }
@@ -957,9 +1064,9 @@ class modxMCP {
         foreach ($nodes as $n) { if ($n['type'] === 'tv') { $tvById[$n['id']] = $n['i']; } }
         $tplById = array();
         foreach ($nodes as $n) { if ($n['type'] === 'template') { $tplById[$n['id']] = $n['i']; } }
-        $lq = $this->modx->newQuery('modTemplateVarTemplate');
+        $lq = $this->modx->newQuery(\MODX\Revolution\modTemplateVarTemplate::class);
         $lq->select(array('templateid', 'tmplvarid'));
-        foreach ($this->modx->getCollection('modTemplateVarTemplate', $lq) as $l) {
+        foreach ($this->modx->getCollection(\MODX\Revolution\modTemplateVarTemplate::class, $lq) as $l) {
             $t = (int) $l->get('templateid');
             $v = (int) $l->get('tmplvarid');
             if (isset($tplById[$t]) && isset($tvById[$v])) {
@@ -969,17 +1076,17 @@ class modxMCP {
 
         // --- Named property sets: [[msProducts@mySet]] can re-point &tpl at another chunk. ---
         $setRefs = array();
-        foreach ($this->modx->getCollection('modPropertySet') as $ps) {
+        foreach ($this->modx->getCollection(\MODX\Revolution\modPropertySet::class) as $ps) {
             $r = $this->scanPropertyRefs($ps->get('properties'));
             if ($r) { $setRefs[(int) $ps->get('id')] = $r; }
         }
         if ($setRefs) {
             $classToType = array(
-                'modTemplate' => 'template', 'modChunk' => 'chunk', 'modSnippet' => 'snippet',
-                'modTemplateVar' => 'tv', 'modPlugin' => 'plugin',
+                \MODX\Revolution\modTemplate::class => 'template', \MODX\Revolution\modChunk::class => 'chunk', \MODX\Revolution\modSnippet::class => 'snippet',
+                \MODX\Revolution\modTemplateVar::class => 'tv', \MODX\Revolution\modPlugin::class => 'plugin',
             );
-            foreach ($this->modx->getCollection('modElementPropertySet') as $link) {
-                $cls  = (string) $link->get('element_class');
+            foreach ($this->modx->getCollection(\MODX\Revolution\modElementPropertySet::class) as $link) {
+                $cls  = $this->normalizeCoreModelClass((string) $link->get('element_class'));
                 $pset = (int) $link->get('property_set');
                 if (!isset($classToType[$cls]) || !isset($setRefs[$pset])) { continue; }
                 $t = $classToType[$cls];
@@ -999,9 +1106,9 @@ class modxMCP {
         //     keeps error/unauthorized pages). No node — a setting is not an element — but such a
         //     chunk is genuinely in use and must never be reported as a safe-to-delete orphan. ---
         $settingUse = array();
-        $sq = $this->modx->newQuery('modSystemSetting');
+        $sq = $this->modx->newQuery(\MODX\Revolution\modSystemSetting::class);
         $sq->select(array('key', 'value'));
-        foreach ($this->modx->getCollection('modSystemSetting', $sq) as $s) {
+        foreach ($this->modx->getCollection(\MODX\Revolution\modSystemSetting::class, $sq) as $s) {
             $k = (string) $s->get('key');
             if (!preg_match('/tpl|chunk|template/i', $k)) { continue; }
             $v = trim((string) $s->get('value'));
@@ -1039,16 +1146,16 @@ class modxMCP {
 
         // --- Template resource counts (O(#templates) COUNTs — never a resource listing). ---
         foreach ($tplById as $tid => $i) {
-            $nodes[$i]['resources'] = (int) $this->modx->getCount('modResource', array('template' => $tid, 'deleted' => 0));
+            $nodes[$i]['resources'] = (int) $this->modx->getCount(\MODX\Revolution\modResource::class, array('template' => $tid, 'deleted' => 0));
         }
 
         // --- Plugin events (what triggers each plugin) as a node field, not as edges. ---
         $pluginById = array();
         foreach ($nodes as $n) { if ($n['type'] === 'plugin') { $pluginById[$n['id']] = $n['i']; } }
         if ($pluginById) {
-            $eq = $this->modx->newQuery('modPluginEvent');
+            $eq = $this->modx->newQuery(\MODX\Revolution\modPluginEvent::class);
             $eq->select(array('pluginid', 'event'));
-            foreach ($this->modx->getCollection('modPluginEvent', $eq) as $pe) {
+            foreach ($this->modx->getCollection(\MODX\Revolution\modPluginEvent::class, $eq) as $pe) {
                 $pid = (int) $pe->get('pluginid');
                 if (!isset($pluginById[$pid])) { continue; }
                 $i = $pluginById[$pid];
@@ -1061,9 +1168,9 @@ class modxMCP {
         if ($withRes && $linkedResources) {
             $ids = array_slice(array_keys($linkedResources), 0, max(0, $maxNodes - count($nodes)));
             if ($ids) {
-                $rq = $this->modx->newQuery('modResource', array('id:IN' => $ids));
+                $rq = $this->modx->newQuery(\MODX\Revolution\modResource::class, array('id:IN' => $ids));
                 $rq->select(array('id', 'pagetitle', 'template', 'published'));
-                foreach ($this->modx->getCollection('modResource', $rq) as $r) {
+                foreach ($this->modx->getCollection(\MODX\Revolution\modResource::class, $rq) as $r) {
                     $rid = (int) $r->get('id');
                     $i = count($nodes);
                     $nodes[$i] = array(
@@ -1105,18 +1212,18 @@ class modxMCP {
         // element referencing it and would look orphaned. Verify each candidate with ONE targeted
         // COUNT — bounded by the number of candidates, not by site size. Auto-skipped on very
         // large sites (where a content LIKE scan is too costly); `verify_orphans` forces it.
-        $resTotal = (int) $this->modx->getCount('modResource');
+        $resTotal = (int) $this->modx->getCount(\MODX\Revolution\modResource::class);
         $verified = isset($data['verify_orphans']) ? !empty($data['verify_orphans']) : ($resTotal <= 5000);
         foreach ($candidates as $n) {
             if ($verified) {
                 $prefix = ($n['type'] === 'chunk') ? '[[$' : (($n['type'] === 'tv') ? '[[*' : '[[');
                 $unc    = ($n['type'] === 'chunk') ? '[[!$' : (($n['type'] === 'tv') ? '[[!*' : '[[!');
-                $q = $this->modx->newQuery('modResource');
+                $q = $this->modx->newQuery(\MODX\Revolution\modResource::class);
                 $q->where(array(array(
                     'content:LIKE'    => '%' . $prefix . $n['name'] . '%',
                     'OR:content:LIKE' => '%' . $unc . $n['name'] . '%',
                 )));
-                if ((int) $this->modx->getCount('modResource', $q) > 0) { continue; }
+                if ((int) $this->modx->getCount(\MODX\Revolution\modResource::class, $q) > 0) { continue; }
             }
             $orphans[] = array(
                 'type'   => $n['type'],
@@ -1413,9 +1520,9 @@ class modxMCP {
      */
     private function previewDelete($elementType, $id) {
         if ($elementType === 'resource') {
-            $r = $this->modx->getObject('modResource', $id);
+            $r = $this->modx->getObject(\MODX\Revolution\modResource::class, $id);
             if (!$r) { throw new ModxMCPClientException("resource {$id} not found."); }
-            $children = (int) $this->modx->getCount('modResource', array('parent' => $id));
+            $children = (int) $this->modx->getCount(\MODX\Revolution\modResource::class, array('parent' => $id));
             return array(
                 'dry_run' => true,
                 'would_delete' => array('type' => 'resource', 'id' => $id, 'pagetitle' => $r->get('pagetitle'), 'uri' => $r->get('uri')),
@@ -1424,9 +1531,9 @@ class modxMCP {
             );
         }
         $classMap = array(
-            'chunk' => array('modChunk', 'name'), 'snippet' => array('modSnippet', 'name'),
-            'template' => array('modTemplate', 'templatename'), 'tv' => array('modTemplateVar', 'name'),
-            'category' => array('modCategory', 'category'), 'plugin' => array('modPlugin', 'name'),
+            'chunk' => array(\MODX\Revolution\modChunk::class, 'name'), 'snippet' => array(\MODX\Revolution\modSnippet::class, 'name'),
+            'template' => array(\MODX\Revolution\modTemplate::class, 'templatename'), 'tv' => array(\MODX\Revolution\modTemplateVar::class, 'name'),
+            'category' => array(\MODX\Revolution\modCategory::class, 'category'), 'plugin' => array(\MODX\Revolution\modPlugin::class, 'name'),
         );
         if (!isset($classMap[$elementType])) { throw new ModxMCPClientException("Cannot preview delete for type {$elementType}."); }
         list($class, $nameField) = $classMap[$elementType];
@@ -1486,7 +1593,7 @@ class modxMCP {
         $dry = !empty($data['dry_run']);
         $results = array();
         foreach ($ids as $id) {
-            $r = $this->modx->getObject('modResource', $id);
+            $r = $this->modx->getObject(\MODX\Revolution\modResource::class, $id);
             if (!$r) { $results[] = array('id' => $id, 'status' => 'not_found'); continue; }
             $row = array('id' => $id, 'pagetitle' => $r->get('pagetitle'));
 
@@ -1495,7 +1602,7 @@ class modxMCP {
                 elseif ($op === 'unpublish'){ $row['change'] = 'published: ' . (int) $r->get('published') . ' -> 0'; }
                 elseif ($op === 'set_template') { $row['change'] = 'template: ' . (int) $r->get('template') . ' -> ' . (int) $data['template']; }
                 elseif ($op === 'move')     { $row['change'] = 'parent: ' . (int) $r->get('parent') . (isset($data['parent_to']) ? ' -> ' . (int) $data['parent_to'] : '') . (!empty($data['context_to']) ? '; context -> ' . $data['context_to'] : ''); }
-                elseif ($op === 'delete')   { $row['change'] = 'DELETE'; $row['child_resources'] = (int) $this->modx->getCount('modResource', array('parent' => $id)); }
+                elseif ($op === 'delete')   { $row['change'] = 'DELETE'; $row['child_resources'] = (int) $this->modx->getCount(\MODX\Revolution\modResource::class, array('parent' => $id)); }
                 $results[] = $row;
                 continue;
             }
@@ -1621,8 +1728,8 @@ class modxMCP {
         $source = $this->initMediaSource($data);
         $rel = isset($data['path']) ? trim((string) $data['path'], '/') : '';
         if ($rel === '') { throw new ModxMCPClientException('delete_media_folder: "path" is required (refusing to remove the source root).'); }
-        // MODX 2.x removeContainer() takes an ABSOLUTE path (unlike createContainer/removeObject).
-        $path = rtrim($this->getMediaSourceRootPath($source), '/\\') . '/' . $rel;
+        // MODX 3 media sources require paths relative to the source root.
+        $path = $rel;
         $res = $source->removeContainer($path);
         if ($res === false) { throw new ModxMCPClientException('delete_media_folder failed: ' . $this->mediaSourceError($source, 'unknown error')); }
         if ($this->modx->getCacheManager()) { $this->modx->getCacheManager()->refresh(); }
@@ -1634,7 +1741,7 @@ class modxMCP {
 
     private function undeleteResource($data) {
         if (empty($data['id'])) { throw new ModxMCPClientException('undelete_resource: "id" is required.'); }
-        $resp = $this->modx->runProcessor('resource/undelete', array('id' => (int) $data['id']));
+        $resp = $this->runCoreProcessor('resource/undelete', array('id' => (int) $data['id']));
         if (!$resp || $resp->isError()) { throw new ModxMCPClientException($resp ? $this->formatProcessorErrors($resp) : 'undelete_resource: no response.'); }
         if ($this->modx->getCacheManager()) { $this->modx->getCacheManager()->refresh(); }
         $this->logAudit('undelete_resource', 'resource', array('id' => (int) $data['id']));
@@ -1642,7 +1749,7 @@ class modxMCP {
     }
 
     private function emptyRecycleBin($data) {
-        $resp = $this->modx->runProcessor('resource/emptyrecyclebin', array());
+        $resp = $this->runCoreProcessor('resource/emptyrecyclebin', array());
         if (!$resp || $resp->isError()) { throw new ModxMCPClientException($resp ? $this->formatProcessorErrors($resp) : 'empty_recycle_bin: no response.'); }
         if ($this->modx->getCacheManager()) { $this->modx->getCacheManager()->refresh(); }
         $this->logAudit('empty_recycle_bin', 'resource', array());
@@ -1655,7 +1762,7 @@ class modxMCP {
         if (!empty($data['name'])) { $props['name'] = (string) $data['name']; }
         if (isset($data['duplicate_children'])) { $props['duplicate_children'] = (bool) $data['duplicate_children']; }
         if (!empty($data['published_mode'])) { $props['published_mode'] = (string) $data['published_mode']; }
-        $resp = $this->modx->runProcessor('resource/duplicate', $props);
+        $resp = $this->runCoreProcessor('resource/duplicate', $props);
         if (!$resp || $resp->isError()) { throw new ModxMCPClientException($resp ? $this->formatProcessorErrors($resp) : 'duplicate_resource: no response.'); }
         if ($this->modx->getCacheManager()) { $this->modx->getCacheManager()->refresh(); }
         $this->logAudit('duplicate_resource', 'resource', array('id' => (int) $data['id']));
@@ -1670,7 +1777,7 @@ class modxMCP {
         if (empty($data['id'])) { throw new ModxMCPClientException('duplicate_element: "id" is required.'); }
         $props = array('id' => (int) $data['id']);
         if (!empty($data['name'])) { $props['name'] = (string) $data['name']; }
-        $resp = $this->modx->runProcessor('element/' . $type . '/duplicate', $props);
+        $resp = $this->runCoreProcessor('element/' . $type . '/duplicate', $props);
         if (!$resp || $resp->isError()) { throw new ModxMCPClientException($resp ? $this->formatProcessorErrors($resp) : 'duplicate_element: no response.'); }
         if ($this->modx->getCacheManager()) { $this->modx->getCacheManager()->refresh(); }
         $this->logAudit('duplicate_element', $type, array('id' => (int) $data['id']));
@@ -1713,7 +1820,7 @@ class modxMCP {
     }
 
     private function refreshUris($data) {
-        $resp = $this->modx->runProcessor('system/refreshuris', array());
+        $resp = $this->runCoreProcessor('system/refreshuris', array());
         if (!$resp || $resp->isError()) { throw new ModxMCPClientException($resp ? $this->formatProcessorErrors($resp) : 'refresh_uris: no response.'); }
         if ($this->modx->getCacheManager()) { $this->modx->getCacheManager()->refresh(); }
         $this->logAudit('refresh_uris', 'system', array());
@@ -1721,7 +1828,7 @@ class modxMCP {
     }
 
     private function removeLocks($data) {
-        $resp = $this->modx->runProcessor('system/remove_locks', array());
+        $resp = $this->runCoreProcessor('system/remove_locks', array());
         if (!$resp || $resp->isError()) { throw new ModxMCPClientException($resp ? $this->formatProcessorErrors($resp) : 'remove_locks: no response.'); }
         $this->logAudit('remove_locks', 'system', array());
         return $this->normalizeProcessorResponse($resp);
@@ -1768,20 +1875,20 @@ class modxMCP {
 
         if (isset($want['counts'])) {
             $out['counts'] = array(
-                'resources'           => $cnt('modResource'),
-                'published_resources' => $cnt('modResource', array('published' => 1, 'deleted' => 0)),
-                'deleted_resources'   => $cnt('modResource', array('deleted' => 1)),
-                'templates'           => $cnt('modTemplate'),
-                'tvs'                 => $cnt('modTemplateVar'),
-                'chunks'              => $cnt('modChunk'),
-                'snippets'            => $cnt('modSnippet'),
-                'plugins'             => $cnt('modPlugin'),
-                'categories'          => $cnt('modCategory'),
-                'contexts'            => $cnt('modContext'),
-                'users'               => $cnt('modUser'),
-                'media_sources'       => $cnt('sources.modMediaSource'),
+                'resources'           => $cnt(\MODX\Revolution\modResource::class),
+                'published_resources' => $cnt(\MODX\Revolution\modResource::class, array('published' => 1, 'deleted' => 0)),
+                'deleted_resources'   => $cnt(\MODX\Revolution\modResource::class, array('deleted' => 1)),
+                'templates'           => $cnt(\MODX\Revolution\modTemplate::class),
+                'tvs'                 => $cnt(\MODX\Revolution\modTemplateVar::class),
+                'chunks'              => $cnt(\MODX\Revolution\modChunk::class),
+                'snippets'            => $cnt(\MODX\Revolution\modSnippet::class),
+                'plugins'             => $cnt(\MODX\Revolution\modPlugin::class),
+                'categories'          => $cnt(\MODX\Revolution\modCategory::class),
+                'contexts'            => $cnt(\MODX\Revolution\modContext::class),
+                'users'               => $cnt(\MODX\Revolution\modUser::class),
+                'media_sources'       => $cnt(\MODX\Revolution\Sources\modMediaSource::class),
             );
-            $products = $cnt('modResource', array('class_key' => 'msProduct'));
+            $products = $cnt(\MODX\Revolution\modResource::class, array('class_key' => 'msProduct'));
             if ($products > 0) { $out['counts']['ms2_products'] = $products; }
         }
 
@@ -1789,26 +1896,26 @@ class modxMCP {
         $tplRows = null;
         if (isset($want['templates']) || isset($want['resources_by_template'])) {
             $tplRows = array();
-            $q = $this->modx->newQuery('modTemplate');
+            $q = $this->modx->newQuery(\MODX\Revolution\modTemplate::class);
             $q->select(array('id', 'templatename'));
             $q->sortby('templatename', 'ASC');
             $q->limit($cap);
-            foreach ($this->modx->getCollection('modTemplate', $q) as $t) {
+            foreach ($this->modx->getCollection(\MODX\Revolution\modTemplate::class, $q) as $t) {
                 $tplRows[(int) $t->get('id')] = $t->get('templatename');
             }
         }
 
         if (isset($want['templates'])) {
-            $tplTotal = $cnt('modTemplate');
+            $tplTotal = $cnt(\MODX\Revolution\modTemplate::class);
             // tv names + template→tv attachments (bounded by #templates × #tvs).
             $tvName = array();
-            $tq = $this->modx->newQuery('modTemplateVar');
+            $tq = $this->modx->newQuery(\MODX\Revolution\modTemplateVar::class);
             $tq->select(array('id', 'name'));
-            foreach ($this->modx->getCollection('modTemplateVar', $tq) as $tv) { $tvName[(int) $tv->get('id')] = $tv->get('name'); }
+            foreach ($this->modx->getCollection(\MODX\Revolution\modTemplateVar::class, $tq) as $tv) { $tvName[(int) $tv->get('id')] = $tv->get('name'); }
             $attach = array();
-            $lq = $this->modx->newQuery('modTemplateVarTemplate');
+            $lq = $this->modx->newQuery(\MODX\Revolution\modTemplateVarTemplate::class);
             $lq->select(array('templateid', 'tmplvarid'));
-            foreach ($this->modx->getCollection('modTemplateVarTemplate', $lq) as $l) {
+            foreach ($this->modx->getCollection(\MODX\Revolution\modTemplateVarTemplate::class, $lq) as $l) {
                 $attach[(int) $l->get('templateid')][] = (int) $l->get('tmplvarid');
             }
             $items = array();
@@ -1816,39 +1923,39 @@ class modxMCP {
                 $tvids = isset($attach[$tid]) ? $attach[$tid] : array();
                 $names = array();
                 foreach ($tvids as $i) { if (isset($tvName[$i])) { $names[] = $tvName[$i]; } }
-                $items[] = array('id' => $tid, 'name' => $name, 'tv_ids' => $tvids, 'tv_names' => $names, 'resource_count' => $cnt('modResource', array('template' => $tid)));
+                $items[] = array('id' => $tid, 'name' => $name, 'tv_ids' => $tvids, 'tv_names' => $names, 'resource_count' => $cnt(\MODX\Revolution\modResource::class, array('template' => $tid)));
             }
             $out['templates'] = array('total' => $tplTotal, 'truncated' => $tplTotal > count($items), 'items' => $items);
         }
 
         if (isset($want['resources_by_template'])) {
             $rbt = array();
-            foreach ($tplRows as $tid => $name) { $rbt[] = array('template_id' => $tid, 'template_name' => $name, 'count' => $cnt('modResource', array('template' => $tid))); }
+            foreach ($tplRows as $tid => $name) { $rbt[] = array('template_id' => $tid, 'template_name' => $name, 'count' => $cnt(\MODX\Revolution\modResource::class, array('template' => $tid))); }
             $out['resources_by_template'] = $rbt;
         }
 
         if (isset($want['tvs'])) {
-            $tvTotal = $cnt('modTemplateVar');
+            $tvTotal = $cnt(\MODX\Revolution\modTemplateVar::class);
             $items = array();
-            $q = $this->modx->newQuery('modTemplateVar');
+            $q = $this->modx->newQuery(\MODX\Revolution\modTemplateVar::class);
             $q->select(array('id', 'name', 'type', 'caption'));
             $q->sortby('name', 'ASC');
             $q->limit($cap);
-            foreach ($this->modx->getCollection('modTemplateVar', $q) as $tv) {
+            foreach ($this->modx->getCollection(\MODX\Revolution\modTemplateVar::class, $q) as $tv) {
                 $items[] = array('id' => (int) $tv->get('id'), 'name' => $tv->get('name'), 'type' => $tv->get('type'), 'caption' => $tv->get('caption'));
             }
             $out['tvs'] = array('total' => $tvTotal, 'truncated' => $tvTotal > count($items), 'items' => $items);
         }
 
         if (isset($want['resource_tree'])) {
-            $rootTotal = $cnt('modResource', array('parent' => 0, 'deleted' => 0));
-            $q = $this->modx->newQuery('modResource', array('parent' => 0, 'deleted' => 0));
+            $rootTotal = $cnt(\MODX\Revolution\modResource::class, array('parent' => 0, 'deleted' => 0));
+            $q = $this->modx->newQuery(\MODX\Revolution\modResource::class, array('parent' => 0, 'deleted' => 0));
             $q->select(array('id', 'pagetitle', 'context_key', 'template', 'published', 'isfolder'));
             $q->sortby('context_key', 'ASC');
             $q->sortby('menuindex', 'ASC');
             $q->limit($maxTree);
             $roots = array();
-            foreach ($this->modx->getCollection('modResource', $q) as $r) {
+            foreach ($this->modx->getCollection(\MODX\Revolution\modResource::class, $q) as $r) {
                 $rid = (int) $r->get('id');
                 $roots[] = array(
                     'id'          => $rid,
@@ -1857,7 +1964,7 @@ class modxMCP {
                     'template'    => (int) $r->get('template'),
                     'published'   => (bool) $r->get('published'),
                     'isfolder'    => (bool) $r->get('isfolder'),
-                    'child_count' => $cnt('modResource', array('parent' => $rid, 'deleted' => 0)),
+                    'child_count' => $cnt(\MODX\Revolution\modResource::class, array('parent' => $rid, 'deleted' => 0)),
                 );
             }
             $out['resource_tree'] = array('depth' => 1, 'total_roots' => $rootTotal, 'truncated' => $rootTotal > count($roots), 'note' => 'Roots + child counts only. Drill down with list_resources(parent=...).', 'roots' => $roots);
@@ -1865,32 +1972,32 @@ class modxMCP {
 
         if (isset($want['resources_by_context'])) {
             $rbc = array();
-            $cq = $this->modx->newQuery('modContext');
+            $cq = $this->modx->newQuery(\MODX\Revolution\modContext::class);
             $cq->select(array('key'));
-            foreach ($this->modx->getCollection('modContext', $cq) as $ctx) {
+            foreach ($this->modx->getCollection(\MODX\Revolution\modContext::class, $cq) as $ctx) {
                 $k = $ctx->get('key');
-                $rbc[] = array('context' => $k, 'count' => $cnt('modResource', array('context_key' => $k, 'deleted' => 0)));
+                $rbc[] = array('context' => $k, 'count' => $cnt(\MODX\Revolution\modResource::class, array('context_key' => $k, 'deleted' => 0)));
             }
             $out['resources_by_context'] = $rbc;
         }
 
         if (isset($want['element_categories'])) {
-            $catTotal = $cnt('modCategory');
+            $catTotal = $cnt(\MODX\Revolution\modCategory::class);
             $items = array();
-            $q = $this->modx->newQuery('modCategory');
+            $q = $this->modx->newQuery(\MODX\Revolution\modCategory::class);
             $q->select(array('id', 'category'));
             $q->sortby('category', 'ASC');
             $q->limit($cap);
-            foreach ($this->modx->getCollection('modCategory', $q) as $c) { $items[] = array('id' => (int) $c->get('id'), 'name' => $c->get('category')); }
+            foreach ($this->modx->getCollection(\MODX\Revolution\modCategory::class, $q) as $c) { $items[] = array('id' => (int) $c->get('id'), 'name' => $c->get('category')); }
             $out['element_categories'] = array('total' => $catTotal, 'truncated' => $catTotal > count($items), 'items' => $items);
         }
 
         if (isset($want['content_types'])) {
             $items = array();
-            $q = $this->modx->newQuery('modContentType');
+            $q = $this->modx->newQuery(\MODX\Revolution\modContentType::class);
             $q->select(array('id', 'name', 'mime_type', 'file_extensions'));
             $q->limit($cap);
-            foreach ($this->modx->getCollection('modContentType', $q) as $ct) {
+            foreach ($this->modx->getCollection(\MODX\Revolution\modContentType::class, $q) as $ct) {
                 $items[] = array('id' => (int) $ct->get('id'), 'name' => $ct->get('name'), 'mime' => $ct->get('mime_type'), 'extensions' => $ct->get('file_extensions'));
             }
             $out['content_types'] = $items;
@@ -1898,9 +2005,9 @@ class modxMCP {
 
         if (isset($want['contexts'])) {
             $items = array();
-            $q = $this->modx->newQuery('modContext');
+            $q = $this->modx->newQuery(\MODX\Revolution\modContext::class);
             $q->select(array('key', 'name'));
-            foreach ($this->modx->getCollection('modContext', $q) as $ctx) { $items[] = array('key' => $ctx->get('key'), 'name' => $ctx->get('name')); }
+            foreach ($this->modx->getCollection(\MODX\Revolution\modContext::class, $q) as $ctx) { $items[] = array('key' => $ctx->get('key'), 'name' => $ctx->get('name')); }
             $out['contexts'] = $items;
         }
 
@@ -1919,10 +2026,10 @@ class modxMCP {
 
     private function staticElementMap() {
         return array(
-            'chunk'    => array('class' => 'modChunk',    'field' => 'snippet',    'dir' => 'chunks',    'ext' => 'tpl'),
-            'snippet'  => array('class' => 'modSnippet',  'field' => 'snippet',    'dir' => 'snippets',  'ext' => 'php'),
-            'template' => array('class' => 'modTemplate', 'field' => 'content',    'dir' => 'templates', 'ext' => 'tpl'),
-            'plugin'   => array('class' => 'modPlugin',   'field' => 'plugincode', 'dir' => 'plugins',   'ext' => 'php'),
+            'chunk'    => array('class' => \MODX\Revolution\modChunk::class,    'field' => 'snippet',    'dir' => 'chunks',    'ext' => 'tpl'),
+            'snippet'  => array('class' => \MODX\Revolution\modSnippet::class,  'field' => 'snippet',    'dir' => 'snippets',  'ext' => 'php'),
+            'template' => array('class' => \MODX\Revolution\modTemplate::class, 'field' => 'content',    'dir' => 'templates', 'ext' => 'tpl'),
+            'plugin'   => array('class' => \MODX\Revolution\modPlugin::class,   'field' => 'plugincode', 'dir' => 'plugins',   'ext' => 'php'),
         );
     }
 
@@ -1985,10 +2092,10 @@ class modxMCP {
 
     private function lineEditMap() {
         return array(
-            'chunk'    => array('class' => 'modChunk',    'field' => 'snippet',    'proc' => 'element/chunk/'),
-            'snippet'  => array('class' => 'modSnippet',  'field' => 'snippet',    'proc' => 'element/snippet/'),
-            'template' => array('class' => 'modTemplate', 'field' => 'content',    'proc' => 'element/template/'),
-            'plugin'   => array('class' => 'modPlugin',   'field' => 'plugincode', 'proc' => 'element/plugin/'),
+            'chunk'    => array('class' => \MODX\Revolution\modChunk::class,    'field' => 'snippet',    'proc' => 'element/chunk/'),
+            'snippet'  => array('class' => \MODX\Revolution\modSnippet::class,  'field' => 'snippet',    'proc' => 'element/snippet/'),
+            'template' => array('class' => \MODX\Revolution\modTemplate::class, 'field' => 'content',    'proc' => 'element/template/'),
+            'plugin'   => array('class' => \MODX\Revolution\modPlugin::class,   'field' => 'plugincode', 'proc' => 'element/plugin/'),
         );
     }
 
@@ -2051,7 +2158,7 @@ class modxMCP {
         $data = $el->toArray();
         $data[$m['field']] = $content;
         $data = $this->filterProcessorData($type, $data);
-        $resp = $this->modx->runProcessor($m['proc'] . 'update', $data);
+        $resp = $this->runCoreProcessor($m['proc'] . 'update', $data);
         if (!$resp || $resp->isError()) {
             throw new ModxMCPClientException('element save failed: ' . ($resp ? $this->formatProcessorErrors($resp) : 'no response.'));
         }
@@ -2297,12 +2404,13 @@ class modxMCP {
         $class = isset($data['class']) ? trim((string) $data['class']) : '';
         if ($class === '') { throw new ModxMCPClientException('describe_object: "class" is required (e.g. modResource, or alias "resource").'); }
         $alias = array(
-            'chunk' => 'modChunk', 'snippet' => 'modSnippet', 'template' => 'modTemplate',
-            'plugin' => 'modPlugin', 'tv' => 'modTemplateVar', 'resource' => 'modResource',
-            'category' => 'modCategory', 'user' => 'modUser', 'usergroup' => 'modUserGroup',
-            'context' => 'modContext', 'setting' => 'modSystemSetting',
+            'chunk' => \MODX\Revolution\modChunk::class, 'snippet' => \MODX\Revolution\modSnippet::class, 'template' => \MODX\Revolution\modTemplate::class,
+            'plugin' => \MODX\Revolution\modPlugin::class, 'tv' => \MODX\Revolution\modTemplateVar::class, 'resource' => \MODX\Revolution\modResource::class,
+            'category' => \MODX\Revolution\modCategory::class, 'user' => \MODX\Revolution\modUser::class, 'usergroup' => \MODX\Revolution\modUserGroup::class,
+            'context' => \MODX\Revolution\modContext::class, 'setting' => \MODX\Revolution\modSystemSetting::class,
         );
         if (isset($alias[strtolower($class)])) { $class = $alias[strtolower($class)]; }
+        $class = $this->normalizeCoreModelClass($class);
         $meta = $this->modx->getFieldMeta($class);
         if (empty($meta)) {
             if (!$this->modx->loadClass($class)) {
@@ -2362,9 +2470,9 @@ class modxMCP {
                 if (!isset($props['context_key'])) { $props['context_key'] = 'web'; }
                 if (!isset($props['parent'])) { $props['parent'] = 0; }
                 if (!isset($props['published'])) { $props['published'] = 1; }
-                $resp = $this->modx->runProcessor('resource/create', $props);
+                $resp = $this->runCoreProcessor('resource/create', $props);
             } else {
-                $resp = $this->modx->runProcessor('resource/update', $props);
+                $resp = $this->runCoreProcessor('resource/update', $props);
             }
             if (!$resp || $resp->isError()) { throw new ModxMCPClientException($resp ? $this->formatProcessorErrors($resp) : 'ms2 category: no response.'); }
             if ($this->modx->getCacheManager()) { $this->modx->getCacheManager()->refresh(); }
@@ -2521,11 +2629,11 @@ class modxMCP {
         // Some add-ons register their input type via the OnTVInputRenderList event, which may
         // have been swallowed above if another plugin on it fataled. Add well-known ones
         // explicitly when their namespace is installed, so they're still reported.
-        if ($this->modx->getObject('modNamespace', array('name' => 'migx'))) {
+        if ($this->modx->getObject(\MODX\Revolution\modNamespace::class, array('name' => 'migx'))) {
             if (!isset($custom['migx']))   { $custom['migx'] = 'MIGX'; }
             if (!isset($custom['migxdb'])) { $custom['migxdb'] = 'MIGXdb'; }
         }
-        if (!isset($custom['colorpicker']) && $this->modx->getObject('modNamespace', array('name' => 'colorpicker'))) {
+        if (!isset($custom['colorpicker']) && $this->modx->getObject(\MODX\Revolution\modNamespace::class, array('name' => 'colorpicker'))) {
             $custom['colorpicker'] = 'ColorPicker';
         }
         return array('core' => $core, 'custom' => $custom);
@@ -2640,17 +2748,17 @@ class modxMCP {
     public function getIntegrationsReport() {
         $out = array();
         foreach ($this->knownIntegrations() as $def) {
-            $installed = (bool) $this->modx->getObject('modNamespace', array('name' => $def['ns']));
+            $installed = (bool) $this->modx->getObject(\MODX\Revolution\modNamespace::class, array('name' => $def['ns']));
             if (!$installed && !empty($def['snippet'])) {
-                $installed = (bool) $this->modx->getObject('modSnippet', array('name' => $def['snippet']));
+                $installed = (bool) $this->modx->getObject(\MODX\Revolution\modSnippet::class, array('name' => $def['snippet']));
             }
             $version = null;
             if ($installed) {
-                $c = $this->modx->newQuery('transport.modTransportPackage');
+                $c = $this->modx->newQuery(\MODX\Revolution\Transport\modTransportPackage::class);
                 $c->where(array('package_name' => $def['label'], 'installed:!=' => null));
                 $c->sortby('installed', 'DESC');
                 $c->limit(1);
-                $pkg = $this->modx->getObject('transport.modTransportPackage', $c);
+                $pkg = $this->modx->getObject(\MODX\Revolution\Transport\modTransportPackage::class, $c);
                 if ($pkg) {
                     $version = trim($pkg->get('version_major') . '.' . $pkg->get('version_minor') . '.' . $pkg->get('version_patch'), '.');
                 }
@@ -2688,11 +2796,11 @@ class modxMCP {
         unset($props['properties']);
         if ($isCreate) {
             if (empty($props['name'])) { throw new ModxMCPClientException('create_media_source: name is required.'); }
-            if (empty($props['class_key'])) { $props['class_key'] = 'sources.modFileMediaSource'; }
-            $resp = $this->modx->runProcessor('source/create', $props);
+            if (empty($props['class_key'])) { $props['class_key'] = \MODX\Revolution\Sources\modFileMediaSource::class; }
+            $resp = $this->runCoreProcessor('source/create', $props);
         } else {
             if (empty($props['id'])) { throw new ModxMCPClientException('update_media_source: id is required.'); }
-            $resp = $this->modx->runProcessor('source/update', $props);
+            $resp = $this->runCoreProcessor('source/update', $props);
         }
         if (!$resp) { throw new ModxMCPClientException('media source: no response.'); }
         if ($resp->isError()) { throw new ModxMCPClientException($this->formatProcessorErrors($resp)); }
@@ -2705,7 +2813,7 @@ class modxMCP {
     }
 
     private function mergeMediaSourceProperties($id, array $map) {
-        $source = $this->modx->getObject('sources.modMediaSource', (int) $id);
+        $source = $this->modx->getObject(\MODX\Revolution\Sources\modMediaSource::class, (int) $id);
         if (!$source) { throw new ModxMCPClientException("media source {$id} not found for properties update."); }
         $current = $source->getProperties();
         if (!is_array($current)) { $current = array(); }
@@ -2722,7 +2830,7 @@ class modxMCP {
 
     private function deleteMediaSource($data) {
         if (empty($data['id'])) { throw new ModxMCPClientException('delete_media_source: id is required.'); }
-        $resp = $this->modx->runProcessor('source/remove', array('id' => (int) $data['id']));
+        $resp = $this->runCoreProcessor('source/remove', array('id' => (int) $data['id']));
         if (!$resp) { throw new ModxMCPClientException('delete_media_source: no response.'); }
         if ($resp->isError()) { throw new ModxMCPClientException($this->formatProcessorErrors($resp)); }
         if ($this->modx->getCacheManager()) { $this->modx->getCacheManager()->refresh(); }
@@ -2730,15 +2838,15 @@ class modxMCP {
         return array('deleted' => true, 'id' => (int) $data['id']);
     }
 
-    private function regenerateToken() {
+    public function regenerateToken() {
         try {
             $token = bin2hex(random_bytes(32));
         } catch (Exception $e) {
             $token = md5(uniqid('modxmcp', true)) . md5(uniqid('token', true));
         }
-        $setting = $this->modx->getObject('modSystemSetting', array('key' => 'modxmcp.api_token'));
+        $setting = $this->modx->getObject(\MODX\Revolution\modSystemSetting::class, array('key' => 'modxmcp.api_token'));
         if (!$setting) {
-            $setting = $this->modx->newObject('modSystemSetting');
+            $setting = $this->modx->newObject(\MODX\Revolution\modSystemSetting::class);
             $setting->fromArray(array(
                 'key'       => 'modxmcp.api_token',
                 'namespace' => 'modxmcp',
@@ -2779,7 +2887,7 @@ class modxMCP {
         $isList = !empty($cfg['list']);
         if ($isList && !isset($props['limit'])) { $props['limit'] = 0; }
 
-        $response = $this->modx->runProcessor($cfg['processor'], $props);
+        $response = $this->runCoreProcessor($cfg['processor'], $props);
         if (!$response) { throw new ModxMCPClientException("Context processor not found or returned nothing: {$cfg['processor']}"); }
         if ($response->isError()) { throw new ModxMCPClientException($this->formatProcessorErrors($response)); }
 
@@ -2799,6 +2907,18 @@ class modxMCP {
      * Map of Access-Control actions to the core MODX security processor that backs them.
      * 'list' => true means the processor returns a getlist {total,results} payload.
      */
+    private function getUserGroup($data) {
+        $id = isset($data['id']) ? (int) $data['id'] : 0;
+        if ($id <= 0) {
+            throw new ModxMCPClientException('get_user_group: id is required.');
+        }
+        $group = $this->modx->getObject(\MODX\Revolution\modUserGroup::class, $id);
+        if (!$group) {
+            throw new ModxMCPClientException("User group not found: {$id}.");
+        }
+        return $group->toArray();
+    }
+
     private function aclActionMap() {
         return $this->procMapFor('acl');
     }
@@ -2837,13 +2957,13 @@ class modxMCP {
 
         // ACL grants/updates target a user group unless told otherwise.
         if (in_array($action, array('grant_context_access', 'update_context_access', 'grant_resourcegroup_access', 'update_resourcegroup_access'), true)) {
-            if (empty($props['principal_class'])) { $props['principal_class'] = 'modUserGroup'; }
+            if (empty($props['principal_class'])) { $props['principal_class'] = \MODX\Revolution\modUserGroup::class; }
         }
 
         $isList = !empty($cfg['list']);
         if ($isList && !isset($props['limit'])) { $props['limit'] = 0; }
 
-        $response = $this->modx->runProcessor($cfg['processor'], $props);
+        $response = $this->runCoreProcessor($cfg['processor'], $props);
         if (!$response) { throw new ModxMCPClientException("ACL processor not found or returned nothing: {$cfg['processor']}"); }
         if ($response->isError()) { throw new ModxMCPClientException($this->formatProcessorErrors($response)); }
 
@@ -2995,6 +3115,13 @@ class modxMCP {
         $props = (isset($data['properties']) && is_array($data['properties'])) ? $data['properties'] : array();
         $options = array();
         if (!empty($data['processors_path'])) { $options['processors_path'] = (string) $data['processors_path']; }
+
+        // For core processors prefer the explicit MODX 3 PSR-4 class. Custom processor
+        // paths remain untouched when processors_path is provided.
+        if (empty($options['processors_path']) && preg_match('#^(context|element|resource|security|source|system|workspace)/#', $processor)) {
+            $processor = $this->coreProcessorClass($processor);
+        }
+
         $response = $this->modx->runProcessor($processor, $props, $options);
         if (!$response) { throw new ModxMCPClientException('run_processor: no response (processor not found?).'); }
         if ($response->isError()) { throw new ModxMCPClientException($this->formatProcessorErrors($response)); }
@@ -3022,10 +3149,10 @@ class modxMCP {
      */
     // --- Package management (toggleable group) ---
     private function defaultProviderId() {
-        $c = $this->modx->newQuery('transport.modTransportProvider');
+        $c = $this->modx->newQuery(\MODX\Revolution\Transport\modTransportProvider::class);
         $c->where(array('name:=' => 'modx.com', 'OR:name:=' => 'modxcms.com'));
-        $p = $this->modx->getObject('transport.modTransportProvider', $c);
-        if (!$p) { $p = $this->modx->getObject('transport.modTransportProvider', array('id:>' => 0)); }
+        $p = $this->modx->getObject(\MODX\Revolution\Transport\modTransportProvider::class, $c);
+        if (!$p) { $p = $this->modx->getObject(\MODX\Revolution\Transport\modTransportProvider::class, array('id:>' => 0)); }
         return $p ? (int) $p->get('id') : 0;
     }
 
@@ -3034,9 +3161,9 @@ class modxMCP {
         if ($name === '') { throw new ModxMCPClientException('install_package: "package" (name) is required.'); }
         $providerId = isset($data['provider']) ? (int) $data['provider'] : $this->defaultProviderId();
         if (!$providerId) { throw new ModxMCPClientException('install_package: no transport provider is configured.'); }
-        $existing = $this->modx->getObject('transport.modTransportPackage', array('package_name' => $name, 'installed:!=' => null));
+        $existing = $this->modx->getObject(\MODX\Revolution\Transport\modTransportPackage::class, array('package_name' => $name, 'installed:!=' => null));
         if ($existing) { return array('status' => 'already_installed', 'package' => $name, 'signature' => $existing->get('signature')); }
-        $listResp = $this->modx->runProcessor('workspace/packages/rest/getlist', array('provider' => $providerId, 'query' => $name, 'limit' => 20));
+        $listResp = $this->runCoreProcessor('workspace/packages/rest/getlist', array('provider' => $providerId, 'query' => $name, 'limit' => 20));
         if (!$listResp || $listResp->isError()) { throw new ModxMCPClientException('install_package: provider search failed: ' . ($listResp ? $this->formatProcessorErrors($listResp) : 'no response')); }
         $listData = json_decode($listResp->getResponse(), true);
         $rows = isset($listData['results']) ? $listData['results'] : array();
@@ -3045,11 +3172,11 @@ class modxMCP {
         foreach ($rows as $row) { if (isset($row['name']) && strcasecmp($row['name'], $name) === 0) { $chosen = $row; break; } }
         if (!$chosen) { $chosen = $rows[0]; }
         if (empty($chosen['location']) || empty($chosen['signature'])) { throw new ModxMCPClientException('install_package: provider result is missing location/signature.'); }
-        $dlResp = $this->modx->runProcessor('workspace/packages/rest/download', array('info' => $chosen['location'] . '::' . $chosen['signature'], 'provider' => $providerId));
+        $dlResp = $this->runCoreProcessor('workspace/packages/rest/download', array('info' => $chosen['location'] . '::' . $chosen['signature'], 'provider' => $providerId));
         if (!$dlResp || $dlResp->isError()) { throw new ModxMCPClientException('install_package: download failed: ' . ($dlResp ? $this->formatProcessorErrors($dlResp) : 'no response')); }
         $dlObj = $dlResp->getObject();
         $signature = (is_array($dlObj) && !empty($dlObj['signature'])) ? $dlObj['signature'] : $chosen['signature'];
-        $instResp = $this->modx->runProcessor('workspace/packages/install', array('signature' => $signature));
+        $instResp = $this->runCoreProcessor('workspace/packages/install', array('signature' => $signature));
         if (!$instResp || $instResp->isError()) { throw new ModxMCPClientException('install_package: install failed: ' . ($instResp ? $this->formatProcessorErrors($instResp) : 'no response')); }
         if ($this->modx->getCacheManager()) { $this->modx->getCacheManager()->refresh(); }
         $this->logAudit('install_package', 'system', array('package' => $name, 'signature' => $signature));
@@ -3059,7 +3186,7 @@ class modxMCP {
     private function uninstallPackage($data) {
         $sig = isset($data['signature']) ? (string) $data['signature'] : '';
         if ($sig === '') { throw new ModxMCPClientException('uninstall_package: "signature" is required (e.g. migx-2.13.0-pl).'); }
-        $resp = $this->modx->runProcessor('workspace/packages/uninstall', array('signature' => $sig));
+        $resp = $this->runCoreProcessor('workspace/packages/uninstall', array('signature' => $sig));
         if (!$resp || $resp->isError()) { throw new ModxMCPClientException($resp ? $this->formatProcessorErrors($resp) : 'uninstall_package: no response.'); }
         if ($this->modx->getCacheManager()) { $this->modx->getCacheManager()->refresh(); }
         $this->logAudit('uninstall_package', 'system', array('signature' => $sig));
@@ -3067,7 +3194,7 @@ class modxMCP {
     }
 
     private function listProviders($data) {
-        $resp = $this->modx->runProcessor('workspace/providers/getlist', array('limit' => 0));
+        $resp = $this->runCoreProcessor('workspace/providers/getlist', array('limit' => 0));
         if (!$resp || $resp->isError()) { throw new ModxMCPClientException($resp ? $this->formatProcessorErrors($resp) : 'list_providers: no response.'); }
         $d = json_decode($resp->getResponse(), true);
         return array('total' => isset($d['total']) ? (int) $d['total'] : 0, 'results' => isset($d['results']) ? $d['results'] : array());
@@ -3077,7 +3204,7 @@ class modxMCP {
         $providerId = isset($data['provider']) ? (int) $data['provider'] : $this->defaultProviderId();
         if (!$providerId) { throw new ModxMCPClientException('search_packages: no transport provider configured.'); }
         $params = array('provider' => $providerId, 'query' => isset($data['query']) ? (string) $data['query'] : '', 'limit' => isset($data['limit']) ? (int) $data['limit'] : 20, 'start' => isset($data['start']) ? (int) $data['start'] : 0);
-        $resp = $this->modx->runProcessor('workspace/packages/rest/getlist', $params);
+        $resp = $this->runCoreProcessor('workspace/packages/rest/getlist', $params);
         if (!$resp || $resp->isError()) { throw new ModxMCPClientException($resp ? $this->formatProcessorErrors($resp) : 'search_packages: no response (provider unreachable?).'); }
         $d = json_decode($resp->getResponse(), true);
         return array('provider' => $providerId, 'total' => isset($d['total']) ? (int) $d['total'] : 0, 'results' => isset($d['results']) ? $d['results'] : array());
@@ -3088,10 +3215,10 @@ class modxMCP {
         unset($props['action'], $props['elementType']);
         if ($isCreate) {
             if (empty($props['name']) || empty($props['service_url'])) { throw new ModxMCPClientException('create_provider: name and service_url are required.'); }
-            $resp = $this->modx->runProcessor('workspace/providers/create', $props);
+            $resp = $this->runCoreProcessor('workspace/providers/create', $props);
         } else {
             if (empty($props['id'])) { throw new ModxMCPClientException('update_provider: id is required.'); }
-            $resp = $this->modx->runProcessor('workspace/providers/update', $props);
+            $resp = $this->runCoreProcessor('workspace/providers/update', $props);
         }
         if (!$resp || $resp->isError()) { throw new ModxMCPClientException($resp ? $this->formatProcessorErrors($resp) : 'provider: no response.'); }
         $this->logAudit($isCreate ? 'create_provider' : 'update_provider', 'provider', array_intersect_key($props, array_flip(array('id', 'name', 'service_url'))));
@@ -3100,7 +3227,7 @@ class modxMCP {
 
     private function deleteProvider($data) {
         if (empty($data['id'])) { throw new ModxMCPClientException('delete_provider: id is required.'); }
-        $resp = $this->modx->runProcessor('workspace/providers/remove', array('id' => (int) $data['id']));
+        $resp = $this->runCoreProcessor('workspace/providers/remove', array('id' => (int) $data['id']));
         if (!$resp || $resp->isError()) { throw new ModxMCPClientException($resp ? $this->formatProcessorErrors($resp) : 'delete_provider: no response.'); }
         $this->logAudit('delete_provider', 'provider', array('id' => (int) $data['id']));
         return array('deleted' => true, 'id' => (int) $data['id']);
@@ -3120,7 +3247,7 @@ class modxMCP {
         $this->modx->lexicon->load('core:default', 'core:workspaces');
         $isList = !empty($cfg['list']);
         if ($isList && !isset($props['limit'])) { $props['limit'] = 0; }
-        $response = $this->modx->runProcessor($cfg['processor'], $props);
+        $response = $this->runCoreProcessor($cfg['processor'], $props);
         if (!$response || $response->isError()) { throw new ModxMCPClientException($response ? $this->formatProcessorErrors($response) : "Workspace processor not found: {$cfg['processor']}"); }
         $this->logAudit($action, 'workspace', array_intersect_key($props, array_flip(array('name', 'namespace', 'topic', 'language'))));
         if ($isList) {
@@ -3212,22 +3339,22 @@ class modxMCP {
     // --- Property sets (modPropertySet + modElementPropertySet), direct xPDO ---
 
     private function propertySetElementClass($data) {
-        if (!empty($data['element_class'])) { return (string) $data['element_class']; }
-        $map = array('snippet' => 'modSnippet', 'chunk' => 'modChunk', 'template' => 'modTemplate', 'plugin' => 'modPlugin', 'tv' => 'modTemplateVar');
+        if (!empty($data['element_class'])) { return $this->normalizeCoreModelClass($data['element_class']); }
+        $map = array('snippet' => \MODX\Revolution\modSnippet::class, 'chunk' => \MODX\Revolution\modChunk::class, 'template' => \MODX\Revolution\modTemplate::class, 'plugin' => \MODX\Revolution\modPlugin::class, 'tv' => \MODX\Revolution\modTemplateVar::class);
         $t = isset($data['element_type']) ? $data['element_type'] : '';
         if (isset($map[$t])) { return $map[$t]; }
         throw new ModxMCPClientException('property set: element_class or a valid element_type (snippet/chunk/template/plugin/tv) is required.');
     }
 
     private function listPropertySets($data) {
-        $c = $this->modx->newQuery('modPropertySet');
+        $c = $this->modx->newQuery(\MODX\Revolution\modPropertySet::class);
         if (!empty($data['query'])) { $c->where(array('name:LIKE' => '%' . $data['query'] . '%')); }
-        $total = $this->modx->getCount('modPropertySet', $c);
+        $total = $this->modx->getCount(\MODX\Revolution\modPropertySet::class, $c);
         $c->sortby('name', 'ASC');
         $limit = $this->getListLimit($data);
         if ($limit > 0) { $c->limit($limit, $this->getListStart($data)); }
         $rows = array();
-        foreach ($this->modx->getCollection('modPropertySet', $c) as $ps) {
+        foreach ($this->modx->getCollection(\MODX\Revolution\modPropertySet::class, $c) as $ps) {
             $rows[] = array(
                 'id'          => (int) $ps->get('id'),
                 'name'        => $ps->get('name'),
@@ -3240,7 +3367,7 @@ class modxMCP {
 
     private function getPropertySet($data) {
         if (empty($data['id'])) { throw new ModxMCPClientException('get_property_set: id is required.'); }
-        $ps = $this->modx->getObject('modPropertySet', (int) $data['id']);
+        $ps = $this->modx->getObject(\MODX\Revolution\modPropertySet::class, (int) $data['id']);
         if (!$ps) { throw new ModxMCPClientException('get_property_set: property set ' . (int) $data['id'] . ' not found.'); }
         return $ps->toArray();
     }
@@ -3248,10 +3375,10 @@ class modxMCP {
     private function savePropertySet($data, $isCreate) {
         if ($isCreate) {
             if (empty($data['name'])) { throw new ModxMCPClientException('create_property_set: name is required.'); }
-            $ps = $this->modx->newObject('modPropertySet');
+            $ps = $this->modx->newObject(\MODX\Revolution\modPropertySet::class);
         } else {
             if (empty($data['id'])) { throw new ModxMCPClientException('update_property_set: id is required.'); }
-            $ps = $this->modx->getObject('modPropertySet', (int) $data['id']);
+            $ps = $this->modx->getObject(\MODX\Revolution\modPropertySet::class, (int) $data['id']);
             if (!$ps) { throw new ModxMCPClientException('update_property_set: property set ' . (int) $data['id'] . ' not found.'); }
         }
         foreach (array('name', 'description', 'category', 'properties') as $f) {
@@ -3265,7 +3392,7 @@ class modxMCP {
 
     private function deletePropertySet($data) {
         if (empty($data['id'])) { throw new ModxMCPClientException('delete_property_set: id is required.'); }
-        $ps = $this->modx->getObject('modPropertySet', (int) $data['id']);
+        $ps = $this->modx->getObject(\MODX\Revolution\modPropertySet::class, (int) $data['id']);
         if (!$ps) { throw new ModxMCPClientException('delete_property_set: property set ' . (int) $data['id'] . ' not found.'); }
         $name = $ps->get('name');
         if (!$ps->remove()) { throw new ModxMCPClientException('delete_property_set: remove failed.'); }
@@ -3278,10 +3405,10 @@ class modxMCP {
         if (empty($data['element']) || empty($data['property_set'])) { throw new ModxMCPClientException('assign_property_set: element and property_set are required.'); }
         $class = $this->propertySetElementClass($data);
         $criteria = array('element' => (int) $data['element'], 'element_class' => $class, 'property_set' => (int) $data['property_set']);
-        if ($this->modx->getObject('modElementPropertySet', $criteria)) {
+        if ($this->modx->getObject(\MODX\Revolution\modElementPropertySet::class, $criteria)) {
             return array('status' => 'already_assigned', 'element' => (int) $data['element'], 'property_set' => (int) $data['property_set']);
         }
-        $eps = $this->modx->newObject('modElementPropertySet');
+        $eps = $this->modx->newObject(\MODX\Revolution\modElementPropertySet::class);
         $eps->fromArray($criteria, '', true, true);
         if (!$eps->save()) { throw new ModxMCPClientException('assign_property_set: save failed.'); }
         if ($this->modx->getCacheManager()) { $this->modx->getCacheManager()->refresh(); }
@@ -3293,7 +3420,7 @@ class modxMCP {
         if (empty($data['element']) || empty($data['property_set'])) { throw new ModxMCPClientException('unassign_property_set: element and property_set are required.'); }
         $class = $this->propertySetElementClass($data);
         $criteria = array('element' => (int) $data['element'], 'element_class' => $class, 'property_set' => (int) $data['property_set']);
-        $eps = $this->modx->getObject('modElementPropertySet', $criteria);
+        $eps = $this->modx->getObject(\MODX\Revolution\modElementPropertySet::class, $criteria);
         if (!$eps) { return array('status' => 'not_assigned', 'element' => (int) $data['element'], 'property_set' => (int) $data['property_set']); }
         if (!$eps->remove()) { throw new ModxMCPClientException('unassign_property_set: remove failed.'); }
         if ($this->modx->getCacheManager()) { $this->modx->getCacheManager()->refresh(); }
@@ -3310,7 +3437,7 @@ class modxMCP {
             $criteria['area'] = $data['area'];
         }
 
-        $settings = $this->modx->getCollection('modSystemSetting', $criteria);
+        $settings = $this->modx->getCollection(\MODX\Revolution\modSystemSetting::class, $criteria);
         $result = [];
         foreach ($settings as $setting) {
             $result[] = $this->normalizeSystemSetting($setting);
@@ -3330,11 +3457,11 @@ class modxMCP {
         if (empty($data['key'])) {
             throw new ModxMCPClientException('System setting key is required.');
         }
-        if ($this->modx->getObject('modSystemSetting', ['key' => $data['key']])) {
+        if ($this->modx->getObject(\MODX\Revolution\modSystemSetting::class, ['key' => $data['key']])) {
             throw new ModxMCPClientException("System setting already exists: {$data['key']}.");
         }
 
-        $setting = $this->modx->newObject('modSystemSetting');
+        $setting = $this->modx->newObject(\MODX\Revolution\modSystemSetting::class);
         $setting->fromArray([
             'key' => $data['key'],
             'value' => array_key_exists('value', $data) ? (string)$data['value'] : '',
@@ -3391,7 +3518,7 @@ class modxMCP {
     }
 
     private function listMediaSources() {
-        $sources = $this->modx->getCollection('sources.modMediaSource');
+        $sources = $this->modx->getCollection(\MODX\Revolution\Sources\modMediaSource::class);
         $result = [];
         foreach ($sources as $source) {
             $result[] = $this->normalizeMediaSource($source, false);
@@ -3651,17 +3778,17 @@ class modxMCP {
             throw new ModxMCPClientException('resource_id is required.');
         }
 
-        $resource = $this->modx->getObject('modResource', $resourceId);
+        $resource = $this->modx->getObject(\MODX\Revolution\modResource::class, $resourceId);
         if (!$resource) {
             throw new ModxMCPClientException("Resource not found: {$resourceId}.");
         }
 
         $templateId = (int)$resource->get('template');
-        $tvLinks = $this->modx->getCollection('modTemplateVarTemplate', ['templateid' => $templateId]);
+        $tvLinks = $this->modx->getCollection(\MODX\Revolution\modTemplateVarTemplate::class, ['templateid' => $templateId]);
         $result = [];
 
         foreach ($tvLinks as $link) {
-            $tv = $this->modx->getObject('modTemplateVar', $link->get('tmplvarid'));
+            $tv = $this->modx->getObject(\MODX\Revolution\modTemplateVar::class, $link->get('tmplvarid'));
             if (!$tv) {
                 continue;
             }
@@ -3690,18 +3817,119 @@ class modxMCP {
             throw new ModxMCPClientException('tvs payload must be a non-empty object/array.');
         }
 
-        $resource = $this->modx->getObject('modResource', $resourceId);
+        $resource = $this->modx->getObject(\MODX\Revolution\modResource::class, $resourceId);
         if (!$resource) {
             throw new ModxMCPClientException("Resource not found: {$resourceId}.");
         }
 
         foreach ($data['tvs'] as $tvName => $tvValue) {
-            $resource->setTVValue($tvName, $tvValue);
+            if (!$resource->setTVValue($tvName, $tvValue)) {
+                throw new ModxMCPClientException("Failed to save TV '{$tvName}' for resource {$resourceId}.");
+            }
         }
 
         $this->modx->cacheManager->refresh();
         $this->logAudit('update_resource_tvs', 'resource_tv', ['resource_id' => $resourceId, 'tv_keys' => array_keys($data['tvs'])]);
         return $this->getResourceTvs(['resource_id' => $resourceId]);
+    }
+
+    private function resolveTvForValueOperation(array $data) {
+        if (!empty($data['tv_id'])) {
+            $tv = $this->modx->getObject(\MODX\Revolution\modTemplateVar::class, (int)$data['tv_id']);
+        } elseif (!empty($data['tv_name'])) {
+            $tv = $this->modx->getObject(\MODX\Revolution\modTemplateVar::class, ['name' => $data['tv_name']]);
+        } else {
+            throw new ModxMCPClientException('tv_id or tv_name is required.');
+        }
+
+        if (!$tv) {
+            throw new ModxMCPClientException('TV not found.');
+        }
+
+        return $tv;
+    }
+
+    private function listTvValues(array $data) {
+        $tv = $this->resolveTvForValueOperation($data);
+        $tvId = (int)$tv->get('id');
+        $start = isset($data['start']) ? max(0, (int)$data['start']) : 0;
+        $limit = isset($data['limit']) ? max(1, min(500, (int)$data['limit'])) : 200;
+
+        $criteria = ['tmplvarid' => $tvId];
+        $total = (int)$this->modx->getCount(\MODX\Revolution\modTemplateVarResource::class, $criteria);
+
+        $q = $this->modx->newQuery(\MODX\Revolution\modTemplateVarResource::class);
+        $q->where($criteria);
+        $q->sortby('contentid', 'ASC');
+        $q->limit($limit, $start);
+
+        $values = [];
+        foreach ($this->modx->getCollection(\MODX\Revolution\modTemplateVarResource::class, $q) as $row) {
+            $resourceId = (int)$row->get('contentid');
+            $resource = $this->modx->getObject(\MODX\Revolution\modResource::class, $resourceId);
+            $values[] = [
+                'resource_id' => $resourceId,
+                'value' => $row->get('value'),
+                'resource_exists' => (bool)$resource,
+                'pagetitle' => $resource ? $resource->get('pagetitle') : null,
+                'uri' => $resource ? $resource->get('uri') : null,
+                'template' => $resource ? (int)$resource->get('template') : null,
+                'published' => $resource ? (bool)$resource->get('published') : null,
+                'deleted' => $resource ? (bool)$resource->get('deleted') : null,
+            ];
+        }
+
+        return [
+            'tv' => [
+                'id' => $tvId,
+                'name' => $tv->get('name'),
+                'caption' => $tv->get('caption'),
+                'default_text' => $tv->get('default_text'),
+                'templates' => $this->getTvTemplates($tvId),
+            ],
+            'total' => $total,
+            'start' => $start,
+            'count' => count($values),
+            'values' => $values,
+        ];
+    }
+
+    private function clearTvValues(array $data) {
+        $tv = $this->resolveTvForValueOperation($data);
+        $tvId = (int)$tv->get('id');
+        $criteria = ['tmplvarid' => $tvId];
+        $count = (int)$this->modx->getCount(\MODX\Revolution\modTemplateVarResource::class, $criteria);
+
+        if (empty($data['confirm'])) {
+            return [
+                'dry_run' => true,
+                'tv_id' => $tvId,
+                'tv_name' => $tv->get('name'),
+                'stored_values' => $count,
+                'message' => 'No values were removed. Pass confirm=true to execute.',
+            ];
+        }
+
+        return $this->runWithTransaction(function () use ($criteria, $tvId, $tv, $count) {
+            if ($count > 0) {
+                $this->modx->removeCollection(\MODX\Revolution\modTemplateVarResource::class, $criteria);
+            }
+
+            $remaining = (int)$this->modx->getCount(\MODX\Revolution\modTemplateVarResource::class, $criteria);
+            if ($remaining !== 0) {
+                throw new ModxMCPClientException("Failed to clear all TV values; {$remaining} record(s) remain.");
+            }
+
+            $this->modx->cacheManager->refresh();
+            $this->logAudit('clear_tv_values', 'tv', ['id' => $tvId, 'removed' => $count]);
+
+            return [
+                'tv_id' => $tvId,
+                'tv_name' => $tv->get('name'),
+                'removed' => $count,
+                'remaining' => 0,
+            ];
+        });
     }
 
     /**
@@ -4158,7 +4386,7 @@ class modxMCP {
         return $payload;
     }
 
-    private function normalizeVirtualPageEvent(xPDOObject $event, $includeRoutes = false) {
+    private function normalizeVirtualPageEvent(\xPDO\Om\xPDOObject $event, $includeRoutes = false) {
         $result = $event->toArray();
         $result['id'] = (int)$result['id'];
         $result['rank'] = (int)$result['rank'];
@@ -4174,7 +4402,7 @@ class modxMCP {
         return $result;
     }
 
-    private function normalizeVirtualPageHandler(xPDOObject $handler, $includeRoutes = false) {
+    private function normalizeVirtualPageHandler(\xPDO\Om\xPDOObject $handler, $includeRoutes = false) {
         $result = $handler->toArray();
         $result['id'] = (int)$result['id'];
         $result['type'] = (int)$result['type'];
@@ -4194,7 +4422,7 @@ class modxMCP {
         return $result;
     }
 
-    private function normalizeVirtualPageRoute(xPDOObject $route) {
+    private function normalizeVirtualPageRoute(\xPDO\Om\xPDOObject $route) {
         $result = $route->toArray();
         $event = $route->getOne('Event');
         $handler = $route->getOne('Handler');
@@ -4279,10 +4507,10 @@ class modxMCP {
             return;
         }
         $map = [
-            0 => 'modResource',
-            1 => 'modSnippet',
-            2 => 'modChunk',
-            3 => 'modTemplate',
+            0 => \MODX\Revolution\modResource::class,
+            1 => \MODX\Revolution\modSnippet::class,
+            2 => \MODX\Revolution\modChunk::class,
+            3 => \MODX\Revolution\modTemplate::class,
         ];
         if (!empty($map[$type]) && !$this->modx->getObject($map[$type], $entry)) {
             throw new ModxMCPClientException("VirtualPage handler entry not found for type {$type}: {$entry}.");
@@ -4309,16 +4537,16 @@ class modxMCP {
             return $service->doEvent('create', $eventName, 'vpEvent', 10);
         }
 
-        $plugin = $this->modx->getObject('modPlugin', ['name' => 'vpEvent']);
+        $plugin = $this->modx->getObject(\MODX\Revolution\modPlugin::class, ['name' => 'vpEvent']);
         if (!$plugin) {
             return false;
         }
-        $event = $this->modx->getObject('modPluginEvent', [
+        $event = $this->modx->getObject(\MODX\Revolution\modPluginEvent::class, [
             'pluginid' => $plugin->get('id'),
             'event' => $eventName,
         ]);
         if (!$event) {
-            $event = $this->modx->newObject('modPluginEvent');
+            $event = $this->modx->newObject(\MODX\Revolution\modPluginEvent::class);
             $event->set('pluginid', $plugin->get('id'));
             $event->set('event', $eventName);
         }
@@ -4357,7 +4585,7 @@ class modxMCP {
         return $result;
     }
 
-    private function applyVirtualPageListFilters(xPDOQuery $query, array $data, array $fields, $alias = '') {
+    private function applyVirtualPageListFilters(\xPDO\Om\xPDOQuery $query, array $data, array $fields, $alias = '') {
         foreach ($fields as $field) {
             if (!array_key_exists($field, $data) || $data[$field] === '' || $data[$field] === null) {
                 continue;
@@ -4529,7 +4757,7 @@ class modxMCP {
     }
 
     private function assertMs2Product($productId) {
-        $product = $this->modx->getObject('modResource', $productId);
+        $product = $this->modx->getObject(\MODX\Revolution\modResource::class, $productId);
         if (!$product) {
             throw new ModxMCPClientException("Product resource not found: {$productId}.");
         }
@@ -4780,7 +5008,7 @@ class modxMCP {
         return $this->modx->getOption('versionx.core_path', null, $this->modx->getOption('core_path') . 'components/versionx/');
     }
 
-    private function normalizeVersionXVersion(xPDOObject $version, array $meta, $includePayload = false) {
+    private function normalizeVersionXVersion(\xPDO\Om\xPDOObject $version, array $meta, $includePayload = false) {
         $labelField = $meta['label'];
         $result = [
             'version_id' => (int)$version->get('version_id'),
@@ -4814,7 +5042,7 @@ class modxMCP {
         return $result;
     }
 
-    private function getVersionXContent(xPDOObject $version) {
+    private function getVersionXContent(\xPDO\Om\xPDOObject $version) {
         foreach (['content', 'snippet', 'plugincode'] as $field) {
             $value = $version->get($field);
             if ($value !== null) {
@@ -4824,7 +5052,7 @@ class modxMCP {
         return null;
     }
 
-    private function getLiveObjectLabel(xPDOObject $object) {
+    private function getLiveObjectLabel(\xPDO\Om\xPDOObject $object) {
         foreach (['pagetitle', 'name', 'templatename', 'caption'] as $field) {
             $value = $object->get($field);
             if ($value !== null && $value !== '') {
@@ -4835,18 +5063,14 @@ class modxMCP {
     }
 
     private function resolveSystemSetting(array $data) {
-        if (!empty($data['key'])) {
-            return $this->modx->getObject('modSystemSetting', ['key' => $data['key']]);
+        if (empty($data['key'])) {
+            throw new ModxMCPClientException('System setting key is required.');
         }
-        if (!empty($data['id'])) {
-            return $this->modx->getObject('modSystemSetting', ['id' => (int)$data['id']]);
-        }
-        return null;
+        return $this->modx->getObject(\MODX\Revolution\modSystemSetting::class, ['key' => $data['key']]);
     }
 
-    private function normalizeSystemSetting(modSystemSetting $setting) {
+    private function normalizeSystemSetting(\MODX\Revolution\modSystemSetting $setting) {
         return [
-            'id' => $setting->get('id'),
             'key' => $setting->get('key'),
             'value' => $setting->get('value'),
             'xtype' => $setting->get('xtype'),
@@ -4857,10 +5081,10 @@ class modxMCP {
 
     private function resolveMediaSource(array $data) {
         if (!empty($data['id'])) {
-            return $this->modx->getObject('sources.modMediaSource', (int)$data['id']);
+            return $this->modx->getObject(\MODX\Revolution\Sources\modMediaSource::class, (int)$data['id']);
         }
         if (!empty($data['name'])) {
-            return $this->modx->getObject('sources.modMediaSource', ['name' => $data['name']]);
+            return $this->modx->getObject(\MODX\Revolution\Sources\modMediaSource::class, ['name' => $data['name']]);
         }
         return null;
     }

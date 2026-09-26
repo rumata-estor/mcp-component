@@ -1,11 +1,13 @@
 <?php
+
+use MODX\Revolution\Processors\Processor;
 /**
  * Manager processor: dependency-graph data for the CMP visualiser.
  *
  * Serves exactly the same graph the `dependency_graph` MCP action returns — one builder, so the
  * picture the owner sees in the manager and the map the AI reasons over can never drift apart.
  */
-class ModxmcpGraphProcessor extends modProcessor {
+class ModxmcpGraphProcessor extends Processor {
 
     public function checkPermissions() {
         return $this->modx->hasPermission('settings');

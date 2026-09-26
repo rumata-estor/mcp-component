@@ -1,4 +1,7 @@
 <?php
+
+use MODX\Revolution\modSystemSetting;
+use MODX\Revolution\modX;
 /**
  * System settings shipped with the modxMCP package (namespace "modxmcp").
  *
@@ -33,7 +36,7 @@ $defs = array(
 
 foreach ($defs as $d) {
     /* @var modSystemSetting $setting */
-    $setting = $modx->newObject('modSystemSetting');
+    $setting = $modx->newObject(modSystemSetting::class);
     $setting->fromArray(array(
         'key' => $d[0],
         'value' => $d[1],
