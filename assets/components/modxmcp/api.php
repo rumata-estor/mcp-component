@@ -116,8 +116,23 @@ if (empty($expectedToken) || !hash_equals($expectedToken, $receivedToken)) {
     exit;
 }
 
-$rawInput = file_get_contents('php://input');
 $maxPayloadBytes = (int)$modx->getOption('modxmcp.max_payload_bytes', null, 1024 * 1024);
+$contentLength = isset($_SERVER['CONTENT_LENGTH']) ? (int)$_SERVER['CONTENT_LENGTH'] : 0;
+if ($maxPayloadBytes > 0 && $contentLength > $maxPayloadBytes) {
+    http_response_code(413);
+    echo json_encode([
+        'success' => false,
+        'error' => 'Payload Too Large',
+    ], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+$rawInput = file_get_contents('php://input');
+if ($rawInput === false) {
+    http_response_code(400);
+    echo json_encode(['success' => false, 'error' => 'Could not read request body'], JSON_UNESCAPED_UNICODE);
+    exit;
+}
 if ($maxPayloadBytes > 0 && strlen($rawInput) > $maxPayloadBytes) {
     http_response_code(413);
     echo json_encode([
