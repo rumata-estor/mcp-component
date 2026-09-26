@@ -1,12 +1,12 @@
 <?php
 $_lang['setting_modxmcp.enabled'] = 'Enable MODX MCP';
-$_lang['setting_modxmcp.enabled_desc'] = 'Globally enables or disables the MODX MCP API component. When disabled, all API requests are rejected.';
+$_lang['setting_modxmcp.enabled_desc'] = 'Globally enables or disables administrative MCP POST operations. The diagnostic GET endpoint remains available and returns only minimal component status.';
 
 $_lang['setting_modxmcp.api_token'] = 'MODX MCP API token';
 $_lang['setting_modxmcp.api_token_desc'] = 'Secret token passed in the X-MCP-Token header to authorize all requests to the MCP API.';
 
 $_lang['setting_modxmcp.service_user_id'] = 'Service user ID';
-$_lang['setting_modxmcp.service_user_id_desc'] = 'The MODX user ID under which MCP executes processors and administrative actions. The user must exist and be active.';
+$_lang['setting_modxmcp.service_user_id_desc'] = 'The MODX user ID under which MCP executes processors and administrative actions. The user must exist, be active and have sudo=1.';
 
 $_lang['setting_modxmcp.debug'] = 'MCP debug mode';
 $_lang['setting_modxmcp.debug_desc'] = 'When enabled, the API returns internal error details in the response. It is recommended to keep this disabled in production.';
@@ -14,11 +14,29 @@ $_lang['setting_modxmcp.debug_desc'] = 'When enabled, the API returns internal e
 $_lang['setting_modxmcp.audit_log'] = 'MCP audit log';
 $_lang['setting_modxmcp.audit_log_desc'] = 'When enabled, create/update/delete operations and TV updates are written to the MODX log for auditing and diagnostics.';
 
+
+$_lang['setting_modxmcp.disabled_groups'] = 'Disabled capability groups';
+$_lang['setting_modxmcp.disabled_groups_desc'] = 'Comma-separated MCP capability groups that the endpoint must not expose. Follow least privilege and enable extra groups only when required.';
+
 $_lang['setting_modxmcp.max_payload_bytes'] = 'Maximum payload size';
 $_lang['setting_modxmcp.max_payload_bytes_desc'] = 'Maximum allowed size of the JSON request body in bytes. Protects the component from oversized or malformed requests.';
 
+
+$_lang['setting_modxmcp.max_read_bytes'] = 'Maximum file read size';
+$_lang['setting_modxmcp.max_read_bytes_desc'] = 'Maximum number of bytes the MCP endpoint may return from a file-read operation.';
+
 $_lang['setting_modxmcp.allow_root_filesystem_read'] = 'Allow root Filesystem read';
 $_lang['setting_modxmcp.allow_root_filesystem_read_desc'] = 'When enabled, MCP may browse and read files through the root Filesystem media source. Keep disabled if you only want safe component-code inspection.';
+
+
+$_lang['setting_modxmcp.require_https'] = 'Require HTTPS';
+$_lang['setting_modxmcp.require_https_desc'] = 'Reject administrative MCP requests unless the connection is protected by HTTPS. Enabled by default. X-Forwarded-Proto is accepted only from an explicitly trusted proxy.';
+
+$_lang['setting_modxmcp.allowed_ips'] = 'Allowed client IPs';
+$_lang['setting_modxmcp.allowed_ips_desc'] = 'Optional comma-separated IP and IPv4 CIDR allowlist for MCP POST requests. The real REMOTE_ADDR is checked; X-Forwarded-For is never trusted. Empty allows any IP with a valid token.';
+
+$_lang['setting_modxmcp.trusted_proxy_ips'] = 'Trusted reverse proxies';
+$_lang['setting_modxmcp.trusted_proxy_ips_desc'] = 'Comma-separated IP and IPv4 CIDR list of trusted reverse proxies whose X-Forwarded-Proto header may be used for HTTPS detection. Empty means proxy headers are not trusted.';
 
 $_lang['setting_modxmcp.component_code_roots'] = 'Component code roots';
 $_lang['setting_modxmcp.component_code_roots_desc'] = 'Comma-separated list of directories that MCP may scan for installed component code, for example core/components,assets/components.';

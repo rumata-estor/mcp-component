@@ -8,14 +8,21 @@ use xPDO\Transport\xPDOTransport;
 /**
  * modxMCP — transport package builder.
  *
- * Run on a MODX 3.x install (CLI or web). It locates config.core.php by walking up
+ * Run from CLI on a MODX 3.x install. It locates config.core.php by walking up
  * from this file, or use the MODX_CONFIG_CORE env var to point at it explicitly.
  *
- *   CLI:  php _build/build.transport.php
- *   web:  place the repo under the docroot and open _build/build.transport.php
+ *   php _build/build.transport.php
+ *
+ * The build entry point is intentionally CLI-only: package builds must not be exposed
+ * as a web endpoint and API tokens must never be passed in query strings.
  *
  * Produces _packages/modxmcp-<version>-<release>.transport.zip
  */
+if (PHP_SAPI !== 'cli') {
+    http_response_code(403);
+    die("Transport package builder is CLI-only.\n");
+}
+
 set_time_limit(0);
 error_reporting(E_ALL & ~E_DEPRECATED & ~E_STRICT);
 
@@ -38,27 +45,22 @@ if (!$config || !file_exists($config)) {
 if (!$config || !file_exists($config)) {
     die("modxMCP build: cannot find config.core.php. Set the MODX_CONFIG_CORE env var to its full path.\n");
 }
+
+// Some MODX installations derive MODX_CORE_PATH from DOCUMENT_ROOT even for CLI.
+// When MODX_CONFIG_CORE points to the site's config.core.php, its directory is the
+// correct document root unless the caller already supplied DOCUMENT_ROOT explicitly.
+if (empty($_SERVER['DOCUMENT_ROOT'])) {
+    $_SERVER['DOCUMENT_ROOT'] = dirname($config);
+}
+
 require_once $config;
 require_once MODX_CORE_PATH . 'vendor/autoload.php';
 
 $modx = modX::getInstance();
 $modx->initialize('mgr');
 
-// When triggered over the web (workspace inside a docroot), require the site's modxMCP token
-// as ?key=… so a stranger can't trigger builds. CLI runs are unrestricted.
-$__isCli = (PHP_SAPI === 'cli') || (defined('XPDO_CLI_MODE') && XPDO_CLI_MODE);
-if (!$__isCli) {
-    $__expected = (string) $modx->getOption('modxmcp.api_token', null, '');
-    $__provided = isset($_GET['key']) ? (string) $_GET['key'] : '';
-    if ($__expected === '' || !hash_equals($__expected, $__provided)) {
-        header('HTTP/1.1 403 Forbidden');
-        die("Forbidden: web build requires ?key=<modxmcp.api_token>. Or run via CLI.\n");
-    }
-}
-
 $modx->setLogLevel(modX::LOG_LEVEL_INFO);
-$modx->setLogTarget((defined('XPDO_CLI_MODE') && XPDO_CLI_MODE) ? 'ECHO' : 'HTML');
-echo ((defined('XPDO_CLI_MODE') && XPDO_CLI_MODE) ? '' : '<pre>');
+$modx->setLogTarget('ECHO');
 $modx->log(modX::LOG_LEVEL_INFO, 'Building modxMCP ' . PKG_VERSION . '-' . PKG_RELEASE . ' ...');
 
 $sources = array(
@@ -106,6 +108,7 @@ $menu->fromArray(array(
     'handler'     => '',
     'action'      => 'index',
     'namespace'   => PKG_NAMESPACE,
+    'permissions' => 'settings',
 ), '', true, true);
 $menuVehicle = $builder->createVehicle($menu, array(
     xPDOTransport::PRESERVE_KEYS => true,
@@ -128,6 +131,7 @@ $menuGraph->fromArray(array(
     'handler'     => '',
     'action'      => 'graph',
     'namespace'   => PKG_NAMESPACE,
+    'permissions' => 'settings',
 ), '', true, true);
 $menuGraphVehicle = $builder->createVehicle($menuGraph, array(
     xPDOTransport::PRESERVE_KEYS => true,
@@ -157,9 +161,11 @@ $assetsVehicle = $builder->createVehicle(
     array('vehicle_class' => xPDOFileVehicle::class)
 );
 $assetsVehicle->resolve('php', array('source' => $sources['resolvers'] . 'resolve.token.php'));
+$assetsVehicle->resolve('php', array('source' => $sources['resolvers'] . 'resolve.service_user.php'));
 $assetsVehicle->resolve('php', array('source' => $sources['resolvers'] . 'resolve.integrations.php'));
+$assetsVehicle->resolve('php', array('source' => $sources['resolvers'] . 'resolve.cleanup.php'));
 $builder->putVehicle($assetsVehicle);
-$modx->log(modX::LOG_LEVEL_INFO, 'Packaged core + assets files and the api_token resolver.');
+$modx->log(modX::LOG_LEVEL_INFO, 'Packaged core + assets files and install resolvers.');
 
 /* ---- package attributes ---- */
 $builder->setPackageAttributes(array(
@@ -174,4 +180,3 @@ $builder->pack();
 
 $signature = $builder->getSignature();
 $modx->log(modX::LOG_LEVEL_INFO, 'DONE. Package: core/packages/' . $signature . '.transport.zip');
-echo ((defined('XPDO_CLI_MODE') && XPDO_CLI_MODE) ? '' : '</pre>');

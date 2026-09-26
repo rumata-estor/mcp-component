@@ -33,7 +33,12 @@ class modxMCP {
     }
 
     public function processRequest($action, $elementType, $data =[]) {
-        $serviceUserId = (int)$this->modx->getOption('modxmcp.service_user_id', null, 1);
+        $serviceUserId = (int)$this->modx->getOption('modxmcp.service_user_id', null, 0);
+        if ($serviceUserId <= 0) {
+            throw new ModxMCPClientException(
+                'Service user is not configured. Set modxmcp.service_user_id to an active sudo user.'
+            );
+        }
         $serviceUser = $this->modx->getObject(\MODX\Revolution\modUser::class, ['id' => $serviceUserId]);
         if (!$serviceUser) {
             throw new ModxMCPClientException("Service user not found: {$serviceUserId}.");
@@ -41,9 +46,13 @@ class modxMCP {
         if (!$serviceUser->get('active')) {
             throw new ModxMCPClientException("Service user is inactive: {$serviceUserId}.");
         }
+        if (!$serviceUser->get('sudo')) {
+            throw new ModxMCPClientException(
+                "Service user must be a sudo user: {$serviceUserId}. Configure modxmcp.service_user_id explicitly."
+            );
+        }
 
         $this->modx->user = $serviceUser;
-        $this->modx->user->set('sudo', 1);
 
         $this->assertCapabilityEnabled($action);
 
@@ -2841,8 +2850,8 @@ class modxMCP {
     public function regenerateToken() {
         try {
             $token = bin2hex(random_bytes(32));
-        } catch (Exception $e) {
-            $token = md5(uniqid('modxmcp', true)) . md5(uniqid('token', true));
+        } catch (Throwable $e) {
+            throw new ModxMCPClientException('Secure token generation failed. Token was not changed.');
         }
         $setting = $this->modx->getObject(\MODX\Revolution\modSystemSetting::class, array('key' => 'modxmcp.api_token'));
         if (!$setting) {

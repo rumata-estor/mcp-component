@@ -26,6 +26,9 @@ jobs:
       - name: Client syntax check
         run: node --check client/index.js
 
+      - name: Portability and safe-defaults check
+        run: node _build/test.portability.js
+
       - name: Version consistency (build.config.php == package.json == package-lock.json)
         run: |
           PKG=$(php -r "include '_build/build.config.php'; echo PKG_VERSION;")
@@ -52,7 +55,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        modx_ref: [v3.2.2-pl, 3.x]
+        modx_ref: [v3.0.0-pl, v3.2.4-pl, 3.x]
     steps:
       - uses: actions/checkout@v4
 

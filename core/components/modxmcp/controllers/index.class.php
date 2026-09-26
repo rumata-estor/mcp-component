@@ -42,6 +42,7 @@ class ModxmcpIndexManagerController extends modExtraManagerController {
     public function process(array $scriptProperties = array()) {
         $this->modx->lexicon->load('modxmcp:default');
         $token = (string) $this->modx->getOption('modxmcp.api_token');
+        $tokenPreview = $token !== '' ? (substr($token, 0, 6) . '…' . substr($token, -4)) : '';
         $siteUrl = rtrim((string) $this->modx->getOption('site_url'), '/');
 
         $integrations = array();
@@ -102,7 +103,8 @@ class ModxmcpIndexManagerController extends modExtraManagerController {
             'l'               => $l,
             'enabled'         => $this->modx->getOption('modxmcp.enabled') ? 1 : 0,
             'token_set'       => $token !== '' ? 1 : 0,
-            'token_full'      => $token !== '' ? $token : '—',
+            'token_preview'   => $tokenPreview,
+            'can_manage_token'=> $this->modx->hasPermission('settings') ? 1 : 0,
             'auto_static'     => $this->modx->getOption('modxmcp.auto_static') ? 1 : 0,
             'audit_log'       => $this->modx->getOption('modxmcp.audit_log') ? 1 : 0,
             'endpoint'        => $siteUrl . '/assets/components/modxmcp/api.php',
