@@ -12,6 +12,10 @@ use MODX\Revolution\modExtraManagerController;
  */
 class ModxmcpIndexManagerController extends modExtraManagerController {
 
+    public function checkPermissions() {
+        return $this->modx->hasPermission('settings');
+    }
+
     public function getPageTitle() {
         return $this->modx->lexicon('modxmcp');
     }

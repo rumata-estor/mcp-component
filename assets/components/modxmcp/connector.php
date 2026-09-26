@@ -9,6 +9,11 @@ require_once MODX_CORE_PATH . 'config/' . MODX_CONFIG_KEY . '.inc.php';
 require_once MODX_CONNECTORS_PATH . 'index.php';
 
 $corePath = $modx->getOption('modxmcp.core_path', null, $modx->getOption('core_path') . 'components/modxmcp/');
+$corePath = str_replace(
+    array('{core_path}', '[[++core_path]]'),
+    rtrim((string) $modx->getOption('core_path'), '/\\') . DIRECTORY_SEPARATOR,
+    (string) $corePath
+);
 
 $modx->request->handleRequest(array(
     'processors_path' => $corePath . 'processors/',

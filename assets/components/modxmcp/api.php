@@ -53,12 +53,16 @@ if (!$isEnabled) {
     exit;
 }
 
-// Optional HTTPS enforcement (modxmcp.require_https, off by default). Honours a
-// reverse-proxy X-Forwarded-Proto header in addition to direct HTTPS / port 443.
-if ((bool) $modx->getOption('modxmcp.require_https', null, false)) {
-    $isHttps = (!empty($_SERVER['HTTPS']) && strtolower($_SERVER['HTTPS']) !== 'off')
-        || (isset($_SERVER['SERVER_PORT']) && (int) $_SERVER['SERVER_PORT'] === 443)
-        || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower($_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https');
+// HTTPS enforcement. New installations enable it by default.
+// X-Forwarded-Proto is trusted only with an explicit opt-in for a trusted reverse proxy.
+if ((bool) $modx->getOption('modxmcp.require_https', null, true)) {
+    $directHttps = (!empty($_SERVER['HTTPS']) && strtolower($_SERVER['HTTPS']) !== 'off')
+        || (isset($_SERVER['SERVER_PORT']) && (int) $_SERVER['SERVER_PORT'] === 443);
+    $trustProxyHttps = (bool) $modx->getOption('modxmcp.trust_proxy_https', null, false);
+    $forwardedHttps = $trustProxyHttps
+        && isset($_SERVER['HTTP_X_FORWARDED_PROTO'])
+        && strtolower(trim((string) $_SERVER['HTTP_X_FORWARDED_PROTO'])) === 'https';
+    $isHttps = $directHttps || $forwardedHttps;
     if (!$isHttps) {
         http_response_code(403);
         echo json_encode(['success' => false, 'error' => 'HTTPS required (modxmcp.require_https).'], JSON_UNESCAPED_UNICODE);

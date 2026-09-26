@@ -1,8 +1,8 @@
-# modxMCP — MODX 3 fork
+# MODX3 MCP
 
-Ветка `modx3` — адаптация modxMCP для **MODX Revolution 3.x** без зависимости от deprecated MODX 2 class aliases.
+MCP-сервер и компонент для **MODX Revolution 3.x**, основанный на оригинальном modxMCP и переработанный под native MODX 3 API.
 
-Целевая совместимость: актуальная ветка **MODX 3.x**. Текущие изменения проверены на **MODX 3.2.4-pl**. До выпуска отдельного transport-релиза используйте ветку `modx3`.
+Целевая совместимость: **MODX Revolution 3.x**. Текущие изменения проверены на MODX 3.2.4-pl; CI также проверяет core processors на 3.2.2-pl и актуальной ветке 3.x.
 
 ## Установка на сайт
 
@@ -11,10 +11,10 @@
 modxMCP не обязан быть установлен как пакет MODX. Для нашей схемы основной вариант — скрытая headless-установка:
 
 - **нет записи в Package Manager**;
-- **нет пункта «Компоненты → modxMCP»**;
+- создаётся пункт «Компоненты → MODX3 MCP» и экран графа связей;
 - файлы размещаются в `core/components/modxmcp/` и `assets/components/modxmcp/`;
-- создаются только namespace `modxmcp` и системные настройки `modxmcp.*`;
-- токен создаётся автоматически при первом запуске;
+- создаются namespace `modxmcp`, системные настройки `modxmcp.*` и Manager menu;
+- API-токен создаётся автоматически во время установки, если ещё не задан;
 - повторный запуск того же скрипта обновляет файлы и сохраняет существующие значения настроек.
 
 Скачайте ZIP ветки `modx3` с GitHub, распакуйте его во временный каталог на сервере и запустите installer. Git для установки не требуется.
@@ -46,7 +46,7 @@ MODX_CONFIG_CORE=/full/path/to/config.core.php php _build/install.headless.php
 
 ### Transport package
 
-Сборка `modxMCP3-*.transport.zip` оставлена как дополнительный вариант для тех случаев, когда компонент нужно регистрировать в Package Manager MODX. Для нашей агентной схемы она не требуется.
+Сборка `modx3mcp-*.transport.zip` предназначена для штатной установки через Package Manager MODX и является основным переносимым вариантом для установки на другой сайт.
 
 ## Что дополнительно проверено для MODX 3
 
@@ -72,7 +72,7 @@ MODX_CONFIG_CORE=/full/path/to/config.core.php php _build/install.headless.php
       "command": "npx",
       "args": ["-y", "github:rumata-estor/mcp-component#modx3"],
       "env": {
-        "MODX_MCP_SITE_URL": "http://САЙТ/assets/components/modxmcp/api.php",
+        "MODX_MCP_SITE_URL": "https://САЙТ/assets/components/modxmcp/api.php",
         "MODX_MCP_TOKEN": "ваш-токен"
       }
     }

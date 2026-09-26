@@ -1,19 +1,23 @@
-# MODX 3 fork notes
+# MODX3 MCP — Changelog
 
-- Added CLI-only headless install/update (`_build/install.headless.php`) as the recommended MODX 3 deployment path: no Package Manager record and no manager menu are created; files, namespace, settings, token and cache refresh are handled directly.
-The `modx3` branch ports modxMCP 1.9.0 to native MODX Revolution 3 APIs while keeping the MCP action surface compatible.
+## 1.0.0 (unreleased)
 
-- Native MODX 3 bootstrap via Composer and `modX::getInstance()`.
-- Core MODX/xPDO model identifiers use FQCN class constants instead of MODX 2 aliases.
-- Core processors are resolved to exact MODX 3 PSR-4 classes, including compound names such as `GetList`, `EmptyRecycleBin`, `RefreshUris`, `TemplateVar`, and `PackageNamespace`.
-- Missing `Security/Group/Get` route replaced with direct xPDO lookup.
-- Legacy model class names supplied at API boundaries are normalized to MODX 3 FQCNs.
-- MODX 3 media-source folder deletion uses relative paths as required since MODX 3.
-- Manager processors/controllers and transport build/install code use namespaced MODX 3 classes.
-- Transport package is named `modxMCP3` while retaining the `modxmcp` component namespace.
-- Processor compatibility is checked against MODX `v3.2.2-pl` and current `3.x`.
+Первый релиз MODX3 MCP на базе оригинального modxMCP.
 
-# Changelog
+- Native MODX Revolution 3 bootstrap, namespaced MODX/xPDO classes и MODX 3 processor routing.
+- Новый product/package identity: `MODX3 MCP` / `MODX3MCP` / Node package `modx3-mcp`; внутренний namespace `modxmcp` сохранён для совместимости.
+- Transport package и CLI/headless installer приведены к переносимой установке без привязки к конкретному серверу.
+- `service_user_id=0` автоматически выбирает первого активного sudo-пользователя; явно заданный ID также обязан быть active + sudo.
+- `auto_static` выключен по умолчанию.
+- HTTPS обязателен по умолчанию; доверие к `X-Forwarded-Proto` включается отдельной настройкой только для доверенного reverse proxy.
+- API token генерируется только через `random_bytes()`; слабые fallback-механизмы удалены.
+- Manager screens требуют permission `settings`; исправлено разворачивание `{core_path}` в Manager connector.
+- Headless installer создаёт/обновляет те же Manager menu, что transport package.
+- Добавляются автоматические portability и client/server contract tests; processor compatibility проверяется на MODX 3.2.2-pl, 3.2.4-pl и ветке 3.x.
+
+## История исходной функциональности modxMCP
+
+Ниже сохранена история исходной линии modxMCP, на которой основан MODX3 MCP.
 
 ## 1.9.0 (2026-08-10)
 

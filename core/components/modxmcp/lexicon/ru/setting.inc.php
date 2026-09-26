@@ -1,12 +1,12 @@
 <?php
-$_lang['setting_modxmcp.enabled'] = 'Включить MODX MCP';
-$_lang['setting_modxmcp.enabled_desc'] = 'Глобально включает или отключает API-компонент MODX MCP. Если настройка выключена, все запросы к API будут отклоняться.';
+$_lang['setting_modxmcp.enabled'] = 'Включить MODX3 MCP';
+$_lang['setting_modxmcp.enabled_desc'] = 'Глобально включает или отключает API-компонент MODX3 MCP. Если настройка выключена, все запросы к API будут отклоняться.';
 
-$_lang['setting_modxmcp.api_token'] = 'API-токен MODX MCP';
+$_lang['setting_modxmcp.api_token'] = 'API-токен MODX3 MCP';
 $_lang['setting_modxmcp.api_token_desc'] = 'Секретный токен, который передаётся в заголовке X-MCP-Token для авторизации всех запросов к MCP API.';
 
 $_lang['setting_modxmcp.service_user_id'] = 'ID сервисного пользователя';
-$_lang['setting_modxmcp.service_user_id_desc'] = 'ID пользователя MODX, от имени которого MCP выполняет процессоры и административные действия. Пользователь должен существовать и быть активным.';
+$_lang['setting_modxmcp.service_user_id_desc'] = 'ID sudo-пользователя MODX, от имени которого MCP выполняет административные действия. Значение 0 автоматически выбирает первого активного sudo-пользователя; положительный ID использует явно указанного активного sudo-пользователя.';
 
 $_lang['setting_modxmcp.debug'] = 'Режим отладки MCP';
 $_lang['setting_modxmcp.debug_desc'] = 'Если включено, API будет возвращать подробности внутренних ошибок в ответе. В продакшене рекомендуется держать выключенным.';
@@ -16,6 +16,13 @@ $_lang['setting_modxmcp.audit_log_desc'] = 'Если включено, опер�
 
 $_lang['setting_modxmcp.max_payload_bytes'] = 'Максимальный размер payload';
 $_lang['setting_modxmcp.max_payload_bytes_desc'] = 'Максимально допустимый размер JSON-запроса к API в байтах. Защищает компонент от слишком больших или ошибочных запросов.';
+
+$_lang['setting_modxmcp.require_https'] = 'Требовать HTTPS';
+$_lang['setting_modxmcp.require_https_desc'] = 'Отклоняет MCP API-запросы без HTTPS. Для новых установок включено по умолчанию.';
+$_lang['setting_modxmcp.trust_proxy_https'] = 'Доверять HTTPS-заголовку reverse proxy';
+$_lang['setting_modxmcp.trust_proxy_https_desc'] = 'Если включено, X-Forwarded-Proto: https считается подтверждением HTTPS. Включайте только за доверенным reverse proxy, который сам формирует этот заголовок.';
+$_lang['setting_modxmcp.allowed_ips'] = 'Разрешённые IP MCP';
+$_lang['setting_modxmcp.allowed_ips_desc'] = 'Необязательный список IP/CIDR через запятую. Пустое значение разрешает любой IP при наличии корректного токена; проверяется реальный REMOTE_ADDR, X-Forwarded-For не используется.';
 
 $_lang['setting_modxmcp.allow_root_filesystem_read'] = 'Разрешить чтение корневого Filesystem';
 $_lang['setting_modxmcp.allow_root_filesystem_read_desc'] = 'Если включено, MCP сможет просматривать и читать файлы через корневой media source Filesystem. Лучше держать выключенной, если нужно только безопасное изучение кода компонентов.';

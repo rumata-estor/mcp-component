@@ -12,6 +12,10 @@ use MODX\Revolution\modExtraManagerController;
  */
 class ModxmcpGraphManagerController extends modExtraManagerController {
 
+    public function checkPermissions() {
+        return $this->modx->hasPermission('settings');
+    }
+
     public function getPageTitle() {
         // getPageTitle() runs before getLanguageTopics() is applied, so load the topic ourselves
         // or the raw lexicon key ends up in the browser title.

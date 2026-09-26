@@ -37,14 +37,18 @@ if ($action === xPDOTransport::ACTION_INSTALL || $action === xPDOTransport::ACTI
     if ($setting && trim((string) $setting->get('value')) === '') {
         try {
             $token = bin2hex(random_bytes(32));
-        } catch (Exception $e) {
-            $token = md5(uniqid('modxmcp', true)) . md5(uniqid('token', true));
+        } catch (Throwable $e) {
+            $modx->log(
+                modX::LOG_LEVEL_ERROR,
+                '[modxMCP] Cannot generate a cryptographically secure API token: ' . $e->getMessage()
+            );
+            return false;
         }
         $setting->set('value', $token);
         $setting->save();
         $modx->log(
             modX::LOG_LEVEL_INFO,
-            '[modxMCP] Generated modxmcp.api_token. The component is enabled; copy the token from System Settings (modxmcp) or Components > modxMCP into your MCP client.'
+            '[MODX3 MCP] Generated modxmcp.api_token. The component is enabled; copy the token from System Settings (modxmcp) or Components > MODX3 MCP into your MCP client.'
         );
     }
     if ($modx->getCacheManager()) {

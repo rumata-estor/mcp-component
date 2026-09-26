@@ -5,10 +5,19 @@ use MODX\Revolution\modSystemSetting;
 use MODX\Revolution\modX;
 use MODX\Revolution\Transport\modTransportPackage;
 /**
- * One-off headless installer + verifier for the modxMCP transport package.
- * TEST/DEV ONLY — delete after use. Installs core/packages/<signature>.transport.zip
- * and reports namespace/settings/token/files. Enables the component for an endpoint test.
+ * CLI-only TEST/DEV helper for installing or uninstalling a locally built transport package.
+ * It never prints the API token and never changes modxmcp.enabled.
+ *
+ * Usage:
+ *   php _build/install.transport.php
+ *   php _build/install.transport.php --sig=modx3mcp-1.0.0-pl
+ *   php _build/install.transport.php --action=uninstall --sig=modx3mcp-1.0.0-pl
  */
+if (PHP_SAPI !== 'cli') {
+    http_response_code(403);
+    die("Transport verifier is CLI-only.\n");
+}
+
 set_time_limit(0);
 error_reporting(E_ALL & ~E_DEPRECATED & ~E_STRICT);
 
@@ -26,10 +35,20 @@ require_once MODX_CORE_PATH . 'vendor/autoload.php';
 
 $modx = modX::getInstance();
 $modx->initialize('mgr');
-header('Content-Type: text/plain; charset=utf-8');
 
-$signature = isset($_GET['sig']) ? preg_replace('/[^a-zA-Z0-9._-]/', '', $_GET['sig']) : 'modxmcp3-1.9.0-pl';
-$action = isset($_GET['action']) ? $_GET['action'] : 'install';
+$signature = 'modx3mcp-1.0.0-pl';
+$action = 'install';
+foreach ($argv as $arg) {
+    if (strpos($arg, '--sig=') === 0) {
+        $signature = preg_replace('/[^a-zA-Z0-9._-]/', '', substr($arg, 6));
+    } elseif (strpos($arg, '--action=') === 0) {
+        $action = substr($arg, 9);
+    }
+}
+if (!in_array($action, array('install', 'uninstall'), true)) {
+    fwrite(STDERR, "Invalid --action. Use install or uninstall.\n");
+    exit(2);
+}
 
 if ($action === 'uninstall') {
     $pkg = $modx->getObject(modTransportPackage::class, array('signature' => $signature));
@@ -85,6 +104,4 @@ echo 'enabled (default): ' . ($en ? var_export($en->get('value'), true) : '?') .
 echo 'file assets/.../api.php: ' . (file_exists(MODX_ASSETS_PATH . 'components/modxmcp/api.php') ? 'yes' : 'NO') . "\n";
 echo 'file core/.../modxmcp.class.php: ' . (file_exists(MODX_CORE_PATH . 'components/modxmcp/model/modxmcp.class.php') ? 'yes' : 'NO') . "\n";
 
-/* enable for an endpoint smoke test (test site) */
-if ($en) { $en->set('value', 1); $en->save(); $modx->getCacheManager()->refresh(); echo "enabled set to 1 for test\n"; }
-echo 'TOKEN=' . $tv . "\n";
+echo "Token value is intentionally not printed by this verifier.\n";

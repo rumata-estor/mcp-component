@@ -1,5 +1,6 @@
 <?php
 
+use MODX\Revolution\modMenu;
 use MODX\Revolution\modNamespace;
 use MODX\Revolution\modSystemSetting;
 use MODX\Revolution\modX;
@@ -196,13 +197,49 @@ if (!$namespace->save()) {
     exit(1);
 }
 
+$menus = array(
+    'modxmcp' => array(
+        'parent' => 'components',
+        'description' => 'modxmcp_menu_desc',
+        'menuindex' => 0,
+        'action' => 'index',
+    ),
+    'modxmcp_graph' => array(
+        'parent' => 'modxmcp',
+        'description' => 'modxmcp_graph_desc',
+        'menuindex' => 1,
+        'action' => 'graph',
+    ),
+);
+foreach ($menus as $text => $definition) {
+    $menu = $modx->getObject(modMenu::class, array('text' => $text));
+    if (!$menu) {
+        $menu = $modx->newObject(modMenu::class);
+        $menu->set('text', $text);
+    }
+    $menu->fromArray(array(
+        'parent' => $definition['parent'],
+        'description' => $definition['description'],
+        'icon' => '',
+        'menuindex' => $definition['menuindex'],
+        'params' => '',
+        'handler' => '',
+        'action' => $definition['action'],
+        'namespace' => 'modxmcp',
+    ), '', true, true);
+    if (!$menu->save()) {
+        fwrite(STDERR, "Failed to save manager menu: {$text}\n");
+        exit(1);
+    }
+}
+
 $settings = array(
     'modxmcp.enabled' => array(1, 'combo-boolean', 'modxmcp:main'),
     'modxmcp.api_token' => array('', 'textfield', 'modxmcp:main'),
-    'modxmcp.service_user_id' => array(1, 'textfield', 'modxmcp:main'),
+    'modxmcp.service_user_id' => array(0, 'textfield', 'modxmcp:main'),
     'modxmcp.audit_log' => array(1, 'combo-boolean', 'modxmcp:main'),
     'modxmcp.debug' => array(0, 'combo-boolean', 'modxmcp:main'),
-    'modxmcp.auto_static' => array(1, 'combo-boolean', 'modxmcp:main'),
+    'modxmcp.auto_static' => array(0, 'combo-boolean', 'modxmcp:main'),
     'modxmcp.disabled_groups' => array(
         'versionx,virtualpage,minishop2,migx,access,property_sets,contexts,package_management,namespaces,lexicon',
         'textfield',
@@ -212,7 +249,8 @@ $settings = array(
     'modxmcp.max_payload_bytes' => array(1048576, 'textfield', 'modxmcp:limits'),
     'modxmcp.max_read_bytes' => array(262144, 'textfield', 'modxmcp:limits'),
     'modxmcp.allow_root_filesystem_read' => array(0, 'combo-boolean', 'modxmcp:security'),
-    'modxmcp.require_https' => array(0, 'combo-boolean', 'modxmcp:security'),
+    'modxmcp.require_https' => array(1, 'combo-boolean', 'modxmcp:security'),
+    'modxmcp.trust_proxy_https' => array(0, 'combo-boolean', 'modxmcp:security'),
     'modxmcp.allowed_ips' => array('', 'textfield', 'modxmcp:security'),
     'modxmcp.component_code_roots' => array('core/components,assets/components', 'textfield', 'modxmcp:security'),
     'modxmcp.core_path' => array('{core_path}components/modxmcp/', 'textfield', 'modxmcp:paths'),
@@ -242,7 +280,8 @@ if ($token === '') {
     try {
         $token = bin2hex(random_bytes(32));
     } catch (Throwable $e) {
-        $token = hash('sha256', uniqid('modxmcp', true) . microtime(true));
+        fwrite(STDERR, "Cannot generate a cryptographically secure API token: " . $e->getMessage() . "\n");
+        exit(1);
     }
     $tokenSetting->set('value', $token);
     if (!$tokenSetting->save()) {
@@ -265,9 +304,9 @@ if ($modx->getCacheManager()) {
 $siteUrl = rtrim((string) $modx->getOption('site_url'), '/');
 $endpointPath = '/assets/components/modxmcp/api.php';
 
-echo "\nmodxMCP headless install/update complete.\n";
-echo "Package Manager record created by this installer: no\n";
-echo "Manager menu created by this installer: no\n";
+echo "\nMODX3 MCP headless install/update complete.\n";
+echo "Package Manager record created by this installer: no (manual/headless install)\n";
+echo "Manager menu created/updated: yes\n";
 echo "Core files: {$targetCore}\n";
 echo "Assets files: {$targetAssets}\n";
 echo "Endpoint path: {$endpointPath}\n";

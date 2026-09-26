@@ -1,12 +1,12 @@
 <?php
-$_lang['setting_modxmcp.enabled'] = 'Enable MODX MCP';
-$_lang['setting_modxmcp.enabled_desc'] = 'Globally enables or disables the MODX MCP API component. When disabled, all API requests are rejected.';
+$_lang['setting_modxmcp.enabled'] = 'Enable MODX3 MCP';
+$_lang['setting_modxmcp.enabled_desc'] = 'Globally enables or disables the MODX3 MCP API component. When disabled, all API requests are rejected.';
 
-$_lang['setting_modxmcp.api_token'] = 'MODX MCP API token';
+$_lang['setting_modxmcp.api_token'] = 'MODX3 MCP API token';
 $_lang['setting_modxmcp.api_token_desc'] = 'Secret token passed in the X-MCP-Token header to authorize all requests to the MCP API.';
 
 $_lang['setting_modxmcp.service_user_id'] = 'Service user ID';
-$_lang['setting_modxmcp.service_user_id_desc'] = 'The MODX user ID under which MCP executes processors and administrative actions. The user must exist and be active.';
+$_lang['setting_modxmcp.service_user_id_desc'] = 'The MODX sudo user ID under which MCP executes administrative actions. Value 0 automatically selects the first active sudo user; a positive ID uses that explicitly configured active sudo user.';
 
 $_lang['setting_modxmcp.debug'] = 'MCP debug mode';
 $_lang['setting_modxmcp.debug_desc'] = 'When enabled, the API returns internal error details in the response. It is recommended to keep this disabled in production.';
@@ -16,6 +16,13 @@ $_lang['setting_modxmcp.audit_log_desc'] = 'When enabled, create/update/delete o
 
 $_lang['setting_modxmcp.max_payload_bytes'] = 'Maximum payload size';
 $_lang['setting_modxmcp.max_payload_bytes_desc'] = 'Maximum allowed size of the JSON request body in bytes. Protects the component from oversized or malformed requests.';
+
+$_lang['setting_modxmcp.require_https'] = 'Require HTTPS';
+$_lang['setting_modxmcp.require_https_desc'] = 'Rejects MCP API requests that are not HTTPS. Enabled by default for new installations.';
+$_lang['setting_modxmcp.trust_proxy_https'] = 'Trust reverse-proxy HTTPS header';
+$_lang['setting_modxmcp.trust_proxy_https_desc'] = 'When enabled, X-Forwarded-Proto: https is accepted as HTTPS evidence. Enable only behind a trusted reverse proxy that sets this header itself.';
+$_lang['setting_modxmcp.allowed_ips'] = 'Allowed MCP IPs';
+$_lang['setting_modxmcp.allowed_ips_desc'] = 'Optional comma-separated IP/CIDR allowlist. Empty allows any IP with a valid token; the real REMOTE_ADDR is checked and X-Forwarded-For is not trusted.';
 
 $_lang['setting_modxmcp.allow_root_filesystem_read'] = 'Allow root Filesystem read';
 $_lang['setting_modxmcp.allow_root_filesystem_read_desc'] = 'When enabled, MCP may browse and read files through the root Filesystem media source. Keep disabled if you only want safe component-code inspection.';

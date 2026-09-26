@@ -6,7 +6,7 @@ if (!class_exists("ModxMCPClientException")) {
     class ModxMCPClientException extends Exception {}
 }
 class modxMCP {
-    const VERSION = '1.9.0';
+    const VERSION = '1.0.0';
     const VARIANT = 'modx3';
     public $modx;
     public $config =[];
@@ -32,18 +32,47 @@ class modxMCP {
         $this->config = array_merge(['corePath' => $corePath], $config);
     }
 
-    public function processRequest($action, $elementType, $data =[]) {
-        $serviceUserId = (int)$this->modx->getOption('modxmcp.service_user_id', null, 1);
-        $serviceUser = $this->modx->getObject(\MODX\Revolution\modUser::class, ['id' => $serviceUserId]);
-        if (!$serviceUser) {
-            throw new ModxMCPClientException("Service user not found: {$serviceUserId}.");
-        }
-        if (!$serviceUser->get('active')) {
-            throw new ModxMCPClientException("Service user is inactive: {$serviceUserId}.");
+    /**
+     * Resolve the MODX account used for processor execution.
+     *
+     * service_user_id > 0: use the explicitly configured active account.
+     * service_user_id = 0: portable default; select the first active sudo account.
+     */
+    private function resolveServiceUser() {
+        $configuredId = (int)$this->modx->getOption('modxmcp.service_user_id', null, 0);
+
+        if ($configuredId > 0) {
+            $user = $this->modx->getObject(\MODX\Revolution\modUser::class, ['id' => $configuredId]);
+            if (!$user) {
+                throw new ModxMCPClientException("Service user not found: {$configuredId}.");
+            }
+            if (!$user->get('active')) {
+                throw new ModxMCPClientException("Service user is inactive: {$configuredId}.");
+            }
+            if (!$user->get('sudo')) {
+                throw new ModxMCPClientException("Service user is not sudo: {$configuredId}.");
+            }
+            return $user;
         }
 
+        $query = $this->modx->newQuery(\MODX\Revolution\modUser::class);
+        $query->where(['active' => 1, 'sudo' => 1]);
+        $query->sortby('id', 'ASC');
+        $query->limit(1);
+        $user = $this->modx->getObject(\MODX\Revolution\modUser::class, $query);
+
+        if (!$user) {
+            throw new ModxMCPClientException(
+                'No active sudo MODX user found. Set modxmcp.service_user_id to an active manager user ID.'
+            );
+        }
+
+        return $user;
+    }
+
+    public function processRequest($action, $elementType, $data =[]) {
+        $serviceUser = $this->resolveServiceUser();
         $this->modx->user = $serviceUser;
-        $this->modx->user->set('sudo', 1);
 
         $this->assertCapabilityEnabled($action);
 
@@ -2841,8 +2870,10 @@ class modxMCP {
     public function regenerateToken() {
         try {
             $token = bin2hex(random_bytes(32));
-        } catch (Exception $e) {
-            $token = md5(uniqid('modxmcp', true)) . md5(uniqid('token', true));
+        } catch (Throwable $e) {
+            throw new ModxMCPClientException(
+                'Cannot generate a cryptographically secure API token: ' . $e->getMessage()
+            );
         }
         $setting = $this->modx->getObject(\MODX\Revolution\modSystemSetting::class, array('key' => 'modxmcp.api_token'));
         if (!$setting) {
@@ -3284,7 +3315,7 @@ class modxMCP {
         if (!isset($map[$action])) { return; }
         $disabled = $this->disabledGroups();
         if (isset($disabled[$map[$action]])) {
-            throw new ModxMCPClientException("Возможность '{$map[$action]}' выключена в modxMCP — включите её в админке: Дополнения → modxMCP. (Capability '{$map[$action]}' is disabled; enable it in Components > modxMCP.)");
+            throw new ModxMCPClientException("Возможность '{$map[$action]}' выключена в MODX3 MCP — включите её в админке: Дополнения → MODX3 MCP. (Capability '{$map[$action]}' is disabled; enable it in Components > MODX3 MCP.)");
         }
     }
 

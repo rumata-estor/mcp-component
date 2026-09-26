@@ -1,5 +1,5 @@
 <?php
-$_lang['modxmcp'] = 'MODX MCP';
+$_lang['modxmcp'] = 'MODX3 MCP';
 $_lang['area_modxmcp_main'] = 'General';
 $_lang['area_modxmcp_security'] = 'Security';
 $_lang['area_modxmcp_logging'] = 'Logging';
