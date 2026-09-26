@@ -195,19 +195,49 @@ if (json_last_error() !== JSON_ERROR_NONE) {
     exit;
 }
 
-if (!$input || !isset($input['action'])) {
+if (!is_array($input) || !isset($input['action']) || !is_string($input['action']) || trim($input['action']) === '') {
     http_response_code(400);
-    echo json_encode(['success' => false, 'error' => 'Bad Request: Missing action.'], JSON_UNESCAPED_UNICODE);
+    echo json_encode(['success' => false, 'error' => 'Bad Request: action must be a non-empty string.'], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+if (strlen($input['action']) > 128) {
+    http_response_code(400);
+    echo json_encode(['success' => false, 'error' => 'Bad Request: action is too long.'], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+if (isset($input['type']) && !is_string($input['type'])) {
+    http_response_code(400);
+    echo json_encode(['success' => false, 'error' => 'Bad Request: type must be a string.'], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+if (isset($input['data']) && !is_array($input['data'])) {
+    http_response_code(400);
+    echo json_encode(['success' => false, 'error' => 'Bad Request: data must be an object.'], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+if (isset($input['name']) && !is_string($input['name'])) {
+    http_response_code(400);
+    echo json_encode(['success' => false, 'error' => 'Bad Request: name must be a string.'], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+if (isset($input['content']) && !is_string($input['content'])) {
+    http_response_code(400);
+    echo json_encode(['success' => false, 'error' => 'Bad Request: content must be a string.'], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+if (isset($input['id']) && !(is_int($input['id']) || (is_string($input['id']) && ctype_digit($input['id'])))) {
+    http_response_code(400);
+    echo json_encode(['success' => false, 'error' => 'Bad Request: id must be a positive integer.'], JSON_UNESCAPED_UNICODE);
     exit;
 }
 
-$action = $input['action'];
-$type   = isset($input['type']) ? $input['type'] : '';
+$action = trim($input['action']);
+$type   = isset($input['type']) ? trim($input['type']) : '';
 $data   = isset($input['data']) ? $input['data'] : [];
 
 if (isset($input['name'])) $data['name'] = $input['name'];
 if (isset($input['content'])) $data['content'] = $input['content'];
-if (isset($input['id'])) $data['id'] = $input['id'];
+if (isset($input['id'])) $data['id'] = (int)$input['id'];
 
 try {
     $corePath = $modx->getOption('modxmcp.core_path', null, $modx->getOption('core_path') . 'components/modxmcp/');
