@@ -272,7 +272,7 @@ $settings = array(
     'modxmcp.max_read_bytes' => array(262144, 'textfield', 'modxmcp:limits'),
     'modxmcp.allow_root_filesystem_read' => array(0, 'combo-boolean', 'modxmcp:security'),
     'modxmcp.require_https' => array(1, 'combo-boolean', 'modxmcp:security'),
-    'modxmcp.allowed_ips' => array('', 'textfield', 'modxmcp:security'),
+    'modxmcp.allowed_ips' => array('', 'textfield', 'modxmcp:security'),\n    'modxmcp.trusted_proxy_ips' => array('', 'textfield', 'modxmcp:security'),
     'modxmcp.component_code_roots' => array('core/components,assets/components', 'textfield', 'modxmcp:security'),
     'modxmcp.core_path' => array('{core_path}components/modxmcp/', 'textfield', 'modxmcp:paths'),
 );
