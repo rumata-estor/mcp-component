@@ -263,14 +263,17 @@ if ($modx->getCacheManager()) {
 }
 
 $siteUrl = rtrim((string) $modx->getOption('site_url'), '/');
-$endpoint = $siteUrl . '/assets/components/modxmcp/api.php';
+$endpointPath = '/assets/components/modxmcp/api.php';
 
 echo "\nmodxMCP headless install/update complete.\n";
 echo "Package Manager record created by this installer: no\n";
 echo "Manager menu created by this installer: no\n";
 echo "Core files: {$targetCore}\n";
 echo "Assets files: {$targetAssets}\n";
-echo "Endpoint: {$endpoint}\n";
+echo "Endpoint path: {$endpointPath}\n";
+if ($siteUrl !== '') {
+    echo "Endpoint from MODX site_url: {$siteUrl}{$endpointPath}\n";
+}
 $showToken = $tokenGenerated || in_array('--show-token', $argv, true);
 if ($showToken) {
     echo "Token: {$token}\n";
