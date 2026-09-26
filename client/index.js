@@ -142,7 +142,9 @@ function isProjectMutationTool(name) {
 }
 
 function acquireProjectLockForTool(name) {
-  if (!isProjectMutationTool(name) || !MANAGER_ROOT) return null;
+  // Local project locking belongs to an optional operations layer. A plain MODX3 MCP
+  // client must remain fully usable without the private/server-side manager directory.
+  if (!isProjectMutationTool(name) || !MANAGER_ROOT || !SITE_ID) return null;
 
   const lockDir = path.join(MANAGER_ROOT, "project.lock");
   const inherited = String(process.env.SITE_PROJECT_LOCK_TOKEN || "").trim();
@@ -481,7 +483,10 @@ async function autoBackupSystemSetting(args, action) {
 }
 
 async function autoBackupForMutation(name, args) {
-  if (SKIP_AUTO_BACKUP) return [];
+  // Local safety backups and workflow gates are an optional integration layer.
+  // When no manager root/site id is configured, do not require infrastructure-specific
+  // environment flags: the public MCP client must work standalone.
+  if (SKIP_AUTO_BACKUP || !MANAGER_ROOT || !SITE_ID) return [];
 
   if (name === "modx_create_element" && ["chunk","snippet","template"].includes(String(args.type))) {
     if (process.env.MODX_MCP_ALLOW_SAFE_ELEMENT_CREATE !== "1") {
