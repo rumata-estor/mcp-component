@@ -169,7 +169,7 @@ builder_requirements = {
     "'readme'": "transport package must include readme attribute",
     "'changelog'": "transport package must include changelog attribute",
     "'requires'": "transport package must declare platform dependencies",
-    "'modx' => '>=3.0.0 <4.0.0'": "transport package must restrict installation to MODX 3.x",
+    "'modx' => '>=3.0.0,<4.0.0'": "transport package must restrict installation to MODX 3.x using xPDO constraint syntax",
 }
 for needle, message in builder_requirements.items():
     if needle not in builder:
