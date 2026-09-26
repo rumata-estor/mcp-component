@@ -157,9 +157,10 @@ $assetsVehicle = $builder->createVehicle(
     array('vehicle_class' => xPDOFileVehicle::class)
 );
 $assetsVehicle->resolve('php', array('source' => $sources['resolvers'] . 'resolve.token.php'));
+$assetsVehicle->resolve('php', array('source' => $sources['resolvers'] . 'resolve.service_user.php'));
 $assetsVehicle->resolve('php', array('source' => $sources['resolvers'] . 'resolve.integrations.php'));
 $builder->putVehicle($assetsVehicle);
-$modx->log(modX::LOG_LEVEL_INFO, 'Packaged core + assets files and the api_token resolver.');
+$modx->log(modX::LOG_LEVEL_INFO, 'Packaged core + assets files and install resolvers.');
 
 /* ---- package attributes ---- */
 $builder->setPackageAttributes(array(
