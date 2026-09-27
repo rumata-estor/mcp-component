@@ -1,18 +1,22 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "\${BASH_SOURCE[0]}")/.." && pwd)"
-PHP_BIN="\${PHP_BIN:-php}"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PHP_BIN="${PHP_BIN:-php}"
 FINAL_INSTALL=1
+PREFLIGHT_ONLY=0
 
-case "\${1:-}" in
+case "${1:-}" in
   "")
     ;;
   --leave-uninstalled)
     FINAL_INSTALL=0
     ;;
+  --preflight-only)
+    PREFLIGHT_ONLY=1
+    ;;
   *)
-    echo "Usage: $0 [--leave-uninstalled]" >&2
+    echo "Usage: $0 [--leave-uninstalled|--preflight-only]" >&2
     exit 2
     ;;
 esac
@@ -23,7 +27,24 @@ if ! command -v "$PHP_BIN" >/dev/null 2>&1; then
 fi
 
 stage="preflight"
-trap 'rc=$?; echo "RELEASE_SMOKE_FAILED stage=$stage rc=$rc" >&2; exit $rc' ERR
+settings_snapshot=""
+
+cleanup() {
+  if [[ -n "$settings_snapshot" && -f "$settings_snapshot" ]]; then
+    rm -f "$settings_snapshot"
+  fi
+}
+
+on_error() {
+  rc=$?
+  echo "RELEASE_SMOKE_FAILED stage=$stage rc=$rc" >&2
+  cleanup
+  exit "$rc"
+}
+
+trap on_error ERR
+trap cleanup EXIT
+
 echo "== MODX3 MCP release smoke =="
 "$PHP_BIN" -v | head -n 2
 
@@ -47,6 +68,7 @@ if command -v node >/dev/null 2>&1; then
 else
   echo "CLIENT_SYNTAX_SKIP node-not-found"
 fi
+
 stage="build-transport"
 "$PHP_BIN" "$ROOT/_build/build.transport.php"
 
@@ -62,12 +84,25 @@ if [[ -z "$signature" ]]; then
 fi
 echo "TRANSPORT_BUILD_OK signature=$signature"
 
+if [[ "$PREFLIGHT_ONLY" -eq 1 ]]; then
+  stage="done"
+  trap - ERR
+  echo "RELEASE_PREFLIGHT_OK signature=$signature"
+  exit 0
+fi
+
+stage="settings-snapshot-original"
+settings_snapshot="$(mktemp "${TMPDIR:-/tmp}/modx3mcp-settings.XXXXXX.json")"
+chmod 600 "$settings_snapshot"
+"$PHP_BIN" "$ROOT/_build/smoke.endpoint.php" "--settings-export=$settings_snapshot"
+
 stage="fresh-install"
 "$PHP_BIN" "$ROOT/_build/install.transport.php"
 echo "FRESH_INSTALL_OK"
 
 stage="endpoint-crud-smoke"
 "$PHP_BIN" "$ROOT/_build/smoke.endpoint.php"
+
 stage="settings-snapshot-before-reinstall"
 before_hash="$(
   "$PHP_BIN" "$ROOT/_build/smoke.endpoint.php" --settings-hash |
@@ -91,6 +126,7 @@ if [[ "$before_hash" != "$after_hash" ]]; then
   exit 6
 fi
 echo "REINSTALL_SETTINGS_PRESERVED_OK"
+
 stage="clean-uninstall"
 "$PHP_BIN" "$ROOT/_build/install.transport.php" --action=uninstall
 echo "CLEAN_UNINSTALL_OK"
@@ -98,6 +134,9 @@ echo "CLEAN_UNINSTALL_OK"
 if [[ "$FINAL_INSTALL" -eq 1 ]]; then
   stage="final-install"
   "$PHP_BIN" "$ROOT/_build/install.transport.php"
+
+  stage="restore-original-settings"
+  "$PHP_BIN" "$ROOT/_build/smoke.endpoint.php" "--settings-restore=$settings_snapshot"
 
   stage="final-read-only-smoke"
   "$PHP_BIN" "$ROOT/_build/smoke.endpoint.php" --read-only
