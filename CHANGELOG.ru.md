@@ -2,7 +2,7 @@
 
 ## 1.0.0 (2026-09-27)
 
-Первый стабильный релиз линии **MODX3 MCP** для MODX Revolution 3.x, созданной на базе оригинального проекта modxMCP.
+Первый стабильный релиз линии **MODX3 MCP** для MODX Revolution 3.x, созданной на базе оригинального проекта [**modxMCP**](https://github.com/dampilov94/mcp-component), автор — [**dampilov94**](https://github.com/dampilov94).
 
 ### Переход на MODX Revolution 3
 
