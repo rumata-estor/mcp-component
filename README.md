@@ -289,4 +289,6 @@ Current stable release: **[MODX3 MCP 1.0.0](https://github.com/rumata-estor/modx
 
 The release includes the source archive, the MODX transport package, and a SHA-256 checksum file.
 
+---
+
 MODX3 MCP can be installed and configured independently using the documentation. In real projects, integration often needs additional work around access permissions, safe workflows, backups, auditing, third-party extras, and the structure of a particular site. This usually requires separate engineering work for the specific project.
