@@ -5,7 +5,7 @@
   "type": "commonjs",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/rumata-estor/mcp-component.git"
+    "url": "git+https://github.com/rumata-estor/modx3-mcp.git"
   },
   "bin": {
     "modx-mcp": "client/index.js",
