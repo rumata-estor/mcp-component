@@ -3,6 +3,7 @@
 use MODX\Revolution\modMenu;
 use MODX\Revolution\modX;
 use MODX\Revolution\Transport\modPackageBuilder;
+use MODX\Revolution\Transport\modTransportPackage;
 use xPDO\Transport\xPDOFileVehicle;
 use xPDO\Transport\xPDOTransport;
 /**
@@ -81,6 +82,18 @@ $modx = modX::getInstance();
 $modx->initialize('mgr');
 $modx->setLogLevel(modX::LOG_LEVEL_INFO);
 $modx->setLogTarget('ECHO');
+
+$desiredSignature = strtolower(PKG_NAME) . '-' . PKG_VERSION . '-' . PKG_RELEASE;
+$installedPackage = $modx->getObject(modTransportPackage::class, array('signature' => $desiredSignature));
+if ($installedPackage && !empty($installedPackage->get('installed'))) {
+    fwrite(
+        STDERR,
+        "Refusing to build {$desiredSignature} on a MODX installation where the same package signature is already installed. " .
+        "Use a clean build MODX or uninstall that package first.\n"
+    );
+    exit(5);
+}
+
 $modx->log(modX::LOG_LEVEL_INFO, 'Building modxMCP ' . PKG_VERSION . '-' . PKG_RELEASE . ' ...');
 
 $sources = array(
@@ -199,4 +212,37 @@ $modx->log(modX::LOG_LEVEL_INFO, 'Packing ...');
 $builder->pack();
 
 $signature = $builder->getSignature();
+$packagesDir = rtrim(MODX_CORE_PATH, '/\\') . DIRECTORY_SEPARATOR . 'packages' . DIRECTORY_SEPARATOR;
+$archivePath = $packagesDir . $signature . '.transport.zip';
+$stagingPath = $packagesDir . $signature;
+
+if (!is_file($archivePath)) {
+    fwrite(STDERR, "Transport package was not created: {$archivePath}\n");
+    exit(4);
+}
+
+// modPackageBuilder leaves its unpacked staging tree next to the archive. On hosts
+// with restrictive permissions this tree can make an immediate test install fail
+// because ZipArchive cannot overwrite the builder's staging files. The staging tree
+// is not part of the release artifact and is safe to remove after pack().
+if (file_exists($stagingPath)) {
+    if (is_link($stagingPath) || !is_dir($stagingPath)) {
+        fwrite(STDERR, "Refusing to remove unexpected package staging path: {$stagingPath}\n");
+        exit(4);
+    }
+    $cacheManager = $modx->getCacheManager();
+    if (!$cacheManager || !$cacheManager->deleteTree($stagingPath, array(
+        'deleteTop' => true,
+        'skipDirs' => false,
+        'extensions' => array(),
+    ))) {
+        fwrite(STDERR, "Could not remove package staging directory: {$stagingPath}\n");
+        exit(4);
+    }
+}
+if (file_exists($stagingPath)) {
+    fwrite(STDERR, "Package staging directory still exists after cleanup: {$stagingPath}\n");
+    exit(4);
+}
+
 $modx->log(modX::LOG_LEVEL_INFO, 'DONE. Package: core/packages/' . $signature . '.transport.zip');
