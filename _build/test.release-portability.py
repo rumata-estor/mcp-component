@@ -219,6 +219,13 @@ for needle, message in {
     "PHP_SAPI !== 'cli'": "endpoint smoke must be CLI-only",
     "--settings-hash": "endpoint smoke settings-hash mode missing",
     "--read-only": "endpoint smoke read-only mode missing",
+    "--settings-export=": "endpoint smoke settings snapshot export mode missing",
+    "--settings-restore=": "endpoint smoke settings restore mode missing",
+    "--settings-compare=": "endpoint smoke settings comparison mode missing",
+    "SETTINGS_SNAPSHOT_OK": "endpoint smoke settings snapshot success marker missing",
+    "SETTINGS_COMPARE_OK": "endpoint smoke settings comparison success marker missing",
+    "SETTINGS_RESTORE_OK": "endpoint smoke settings restore success marker missing",
+    "MODX_DOCUMENT_ROOT": "endpoint smoke portable CLI bootstrap missing",
     "MCP_ENDPOINT_SMOKE_OK": "endpoint CRUD smoke success marker missing",
     "MCP_ENDPOINT_READ_ONLY_SMOKE_OK": "endpoint read-only smoke marker missing",
     "finally": "endpoint smoke must guarantee CRUD cleanup",
@@ -230,9 +237,15 @@ if "TOKEN=" in endpoint_smoke or "echo $token" in endpoint_smoke:
     fail("endpoint smoke must never print the API token")
 
 release_smoke = (ROOT / "_build/release.smoke.sh").read_text()
+if r"\${" in release_smoke:
+    fail("release smoke: shell variables must not be backslash-escaped")
+
 for needle, message in {
     "php-lint": "release smoke PHP lint stage missing",
     "build.transport.php": "release smoke transport build stage missing",
+    "--preflight-only": "release smoke non-mutating preflight mode missing",
+    "--settings-export=": "release smoke original settings snapshot missing",
+    "--settings-restore=": "release smoke original settings restore missing",
     "REINSTALL_SETTINGS_PRESERVED_OK": "release smoke settings preservation check missing",
     "--action=uninstall": "release smoke clean uninstall stage missing",
     "--read-only": "release smoke final read-only verification missing",
@@ -261,6 +274,10 @@ builder_requirements = {
     "'changelog'": "transport package must include changelog attribute",
     "'requires'": "transport package must declare platform dependencies",
     "'modx' => '>=3.0.0,<4.0.0'": "transport package must restrict installation to MODX 3.x using xPDO constraint syntax",
+    "Package staging directory still exists after cleanup": "transport builder must remove its unpacked staging tree after pack()",
+    "deleteTree($stagingPath": "transport builder staging cleanup must use a bounded package path",
+    "modTransportPackage::class": "transport builder must detect an already installed same-signature package",
+    "Refusing to build {$desiredSignature}": "transport builder must refuse to clobber an installed package staging tree",
 }
 for needle, message in builder_requirements.items():
     if needle not in builder:
