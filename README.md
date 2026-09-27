@@ -249,10 +249,10 @@ For the stable 1.0.0 release:
 }
 ```
 
-For development, use the `modx3` branch instead of a release tag:
+For development, use the `main` branch instead of a release tag:
 
 ```text
-github:rumata-estor/modx3-mcp#modx3
+github:rumata-estor/modx3-mcp#main
 ```
 
 For production sites, pinning a specific release is recommended.
