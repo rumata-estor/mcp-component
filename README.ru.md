@@ -249,10 +249,10 @@ MODX_CONFIG_CORE=/full/path/to/config.core.php php _build/install.headless.php
 }
 ```
 
-Для разработки вместо тега версии можно использовать ветку `modx3`:
+Для разработки вместо тега версии можно использовать ветку `main`:
 
 ```text
-github:rumata-estor/modx3-mcp#modx3
+github:rumata-estor/modx3-mcp#main
 ```
 
 Для рабочих сайтов рекомендуется закреплять конкретную версию.
