@@ -37,8 +37,40 @@ if (!$config || !is_file($config)) {
     exit(2);
 }
 
+
+// Some MODX installations build all paths from $_SERVER['DOCUMENT_ROOT'] even in
+// config.core.php. CLI normally leaves it empty, which would turn paths into /core/,
+// /assets/, etc. Allow an explicit root and otherwise infer it from config.core.php.
+$documentRoot = trim((string)getenv('MODX_DOCUMENT_ROOT'));
+if ($documentRoot !== '') {
+    $documentRoot = rtrim($documentRoot, '/\\');
+    if (!is_file($documentRoot . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'vendor' . DIRECTORY_SEPARATOR . 'autoload.php')) {
+        fwrite(STDERR, "MODX_DOCUMENT_ROOT does not look like a MODX web root: {$documentRoot}\n");
+        exit(2);
+    }
+    $_SERVER['DOCUMENT_ROOT'] = $documentRoot;
+} elseif (PHP_SAPI === 'cli' && empty($_SERVER['DOCUMENT_ROOT'])) {
+    $probe = dirname((string)(realpath($config) ?: $config));
+    for ($i = 0; $i < 12; $i++) {
+        $autoload = $probe . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'vendor' . DIRECTORY_SEPARATOR . 'autoload.php';
+        if (is_file($autoload)) {
+            $_SERVER['DOCUMENT_ROOT'] = rtrim($probe, '/\\');
+            break;
+        }
+        $parent = dirname($probe);
+        if ($parent === $probe) {
+            break;
+        }
+        $probe = $parent;
+    }
+}
+
 require_once $config;
-require_once MODX_CORE_PATH . 'vendor/autoload.php';
+if (!defined('MODX_CORE_PATH') || !is_file(rtrim(MODX_CORE_PATH, '/\\') . DIRECTORY_SEPARATOR . 'vendor' . DIRECTORY_SEPARATOR . 'autoload.php')) {
+    fwrite(STDERR, "MODX bootstrap failed: MODX_CORE_PATH/vendor/autoload.php not found. Set MODX_DOCUMENT_ROOT when config.core.php depends on DOCUMENT_ROOT.\n");
+    exit(2);
+}
+require_once rtrim(MODX_CORE_PATH, '/\\') . DIRECTORY_SEPARATOR . 'vendor' . DIRECTORY_SEPARATOR . 'autoload.php';
 
 $modx = modX::getInstance();
 $modx->initialize('mgr');
