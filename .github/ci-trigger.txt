@@ -1,0 +1,1 @@
+Temporary CI trigger for MODX3 MCP 1.0.0 RC11.
