@@ -8,7 +8,6 @@ It is written so that an experienced developer can quickly understand the projec
 
 For a normal installation, the published release and MCP client configuration are usually enough. Development, server-side changes, security settings, production upgrades, and unusual failures require more technical experience. If, after reading the relevant section, you still cannot clearly explain what will change and how you will verify it, do not experiment on a live site. Use a test environment or involve someone with the right experience.
 
-You can also give this document to an AI assistant before it works on the project. The assistant should treat it as project rules: first understand the affected area, then explain the impact, and only then make changes. AI can make the work much faster, but it does not remove responsibility for access control, backups, verification, and choosing the right test environment.
 
 MODX3 MCP is designed for **MODX Revolution 3.x**. Instructions written for the old MODX 2 line must not be copied here mechanically: MODX 3 changed PHP class names, namespaces, core bootstrap, and the location and resolution of built-in processors.
 
@@ -237,11 +236,11 @@ php _build/test.modx3-processors.php /path/to/modx/core/src/Revolution/Processor
 
 On GitHub, this is checked against MODX 3.2.2-pl, 3.2.4-pl, and the current 3.x branch.
 
-If you or the AI are not sure which class, processor, or field to use, the correct next step is to **read the current MODX or extra source code**, not guess.
+If you are not sure which class, processor, or field to use, the correct next step is to **read the current MODX or extra source code**, not guess.
 
 ## 6. How to add a new capability
 
-Even if you are not a developer, this section is useful because it shows what a correct change should look like.
+Even if you are not a developer, this section is useful because it shows the required parts of a correct project extension.
 
 Before changing code, answer four questions:
 
@@ -676,11 +675,11 @@ instead of a development branch.
 
 ### After an upgrade, test reading first
 
-Ask the AI to:
+Start with safe read-only checks:
 
-- show version and system information;
+- verify version and system information;
 - read several known elements;
-- show the project structure;
+- verify the project structure;
 - build a dependency graph.
 
 Only after that should you move to write operations.
@@ -737,60 +736,8 @@ The local Node.js part and the site component are on different versions.
 
 Bring both sides to the same release.
 
-## 19. Using AI if you are not a developer
 
-AI can help you understand the project, prepare changes, and perform much of the technical work. But the closer the task is to production deployment, permissions, packages, system settings, APIs, or data changes, the more important it is to understand the consequences.
-
-You do not need to read all the PHP yourself. But before a change, you should get a clear explanation from the AI: what will be affected, how it will be backed up, how the result will be checked, and how to recover if something goes wrong.
-
-If the explanation is still unclear after follow-up questions, that is a good sign that the task should first be tested on a separate site or handled by someone who is comfortable with MODX and server administration.
-
-Before a task, you can give the AI this instruction:
-
-```text
-Read DEVELOPMENT.md, README.md, and CHANGELOG.md.
-
-Do not change anything yet.
-
-First:
-1. find the files related to the task;
-2. explain in simple terms how this part works now;
-3. list the risks;
-4. tell me which checks must be run after the change;
-5. only then propose the smallest reasonable change.
-```
-
-After the change:
-
-```text
-Check the change against DEVELOPMENT.md.
-
-Run the relevant automated checks.
-If PHP changed, run php -l.
-If MCP tools or server actions changed, check client/server consistency.
-If installation, system settings, or security changed, run the portability and security test.
-
-Explain clearly:
-1. what was checked;
-2. what passed;
-3. what still needs to be tested on a real MODX test installation.
-```
-
-For a dangerous operation, also ask:
-
-```text
-What data can this operation damage?
-Is a backup created?
-Can I preview the change first?
-Is there a no-write test mode?
-What happens if the operation stops halfway through?
-Why is this particular MODX mechanism being used?
-Can this be tested on a separate site first?
-```
-
-A good AI answer should describe concrete safeguards and checks, not just say "it is safe".
-
-## 20. What a developer or AI should explain before a serious change
+## 19. What a developer should verify before a serious change
 
 Before any significant change, the following should be clear:
 
@@ -808,7 +755,7 @@ Before any significant change, the following should be clear:
 
 If these questions cannot be answered clearly, the change is not ready.
 
-## 21. What is not part of MODX3 MCP
+## 20. What is not part of MODX3 MCP
 
 The Telegram bot, external server scripts, and internal `AGENT.md` used in our own agent environment are not required parts of MODX3 MCP.
 
@@ -816,7 +763,7 @@ The project should remain a standalone MCP server and MODX component.
 
 It can be connected to any compatible MCP application or agent environment.
 
-## 22. Minimum checks before a Pull Request or release
+## 21. Minimum checks before a Pull Request or release
 
 Basic commands:
 
