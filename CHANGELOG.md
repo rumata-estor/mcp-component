@@ -1,34 +1,71 @@
+**English** | [Русский](CHANGELOG.ru.md)
+
 # MODX3 MCP — Changelog
 
 ## 1.0.0 (2026-09-27)
 
-Первый релиз новой MODX 3-линейки на базе оригинального modxMCP.
+The first stable release of the **MODX3 MCP** line for MODX Revolution 3.x, based on the original [**modxMCP**](https://github.com/dampilov94/mcp-component) project by [**dampilov94**](https://github.com/dampilov94).
 
-- Новый product/package identity: `MODX3 MCP` / `MODX3MCP` / Node package `modx3-mcp`; внутренний namespace `modxmcp` сохранён.
-- Native MODX Revolution 3 bootstrap, namespaced MODX/xPDO classes и MODX 3 processor routing.
-- Transport package и CLI/headless installer приведены к переносимой установке без привязки к конкретному сайту.
-- `service_user_id=0` автоматически выбирает активного sudo-пользователя; жёсткая зависимость от user ID 1 удалена.
-- `auto_static` выключен по умолчанию.
-- HTTPS обязателен по умолчанию; доверие `X-Forwarded-Proto` вынесено в отдельный explicit opt-in.
-- Удалены слабые fallback-механизмы генерации API token: используется только `random_bytes()` с fail-closed поведением.
-- Manager screens требуют permission `settings`; исправлено разворачивание `{core_path}` в Manager connector.
-- Добавлены автоматические portability и client/server contract tests; processor compatibility проверяется на MODX 3.2.2-pl, 3.2.4-pl и ветке 3.x.
-- Headless installer теперь создаёт/обновляет Manager menu, сохраняя существующие настройки и token.
-- Install paths ограничены MODX Revolution `>=3.0.0,<4.0.0`: transport package через `requires`, headless installer через explicit version preflight.
-- Headless deployment переведён на staged core/assets trees с directory swap и rollback предыдущих trees при ошибке; runtime audit log сохраняется между обновлениями. Namespace/menu/settings/token writes выполняются в общей xPDO transaction и откатываются вместе с файлами при незавершённой установке.
-- Transport uninstall удаляет оба Manager menu, `modxmcp.*` settings, namespace и component files; CLI release verifier проверяет отсутствие leftovers перед удалением package record.
-- Transport/headless parity test сравнивает все 16 `modxmcp.*` definitions целиком: default value, xtype и area.
-- Transport builder переведён в CLI-only режим; API token больше не принимается через query string, чтобы исключить утечку секрета через URL/access logs/browser history.
-- Endpoint hardening: HTTPS enforcement выполняется до health GET; `Content-Length` проверяется до чтения request body, фактический размер — после чтения; transaction helper откатывает на любом `Throwable`.
-- `service_user_id=0` выбирает только active+sudo пользователя; явно заданный service user также обязан уже быть active+sudo.
-- Добавлены серверные `list_tv_values` / `clear_tv_values` для безопасной работы с явно сохранёнными TV values; destructive clear требует confirm и клиент делает safety backup.
-- Добавлен `_build/release.smoke.sh` + `_build/smoke.endpoint.php`: автоматический PHP lint → build → install → endpoint/CRUD smoke → settings-preservation reinstall → clean uninstall → final install/read-only smoke без вывода API token.
-- Клиент поддерживает необязательный `MODX_MCP_AUDIT_HOOK`: после успешной mutating-операции доверенная внешняя команда получает JSON операции и пути safety backup через stdin; отсутствие hook не меняет обычную работу клиента, а ошибка hook даёт warning без ложного отката уже выполненной записи.
-- Project lock/read-only classification расширена для дополнительных групп: `list/get/search/read/view/check/describe/find/suggest` и отдельные read actions больше не считаются write-операциями и не создают лишние lock/audit события.
+Version 1.0.0 is not a simple port of the original component to MODX 3. The project was substantially reworked: MODX bootstrap and routing, installation and upgrade flow, the security model, service-user handling, write operations, auditing, backups, and automated release checks were all changed. MODX 3-specific updates — namespaces, MODX/xPDO classes, processor routes, and installation paths — are listed below.
 
-## История исходной функциональности modxMCP
+The migration was not done by mechanically replacing class names and paths. The implementation was adapted to how MODX 3 actually behaves: core bootstrap, namespaces, processors, permissions, the service user, package installation, transactions, and rollback. For critical parts, we tested not only whether the code runs, but whether it behaves predictably during installation, reinstall, failure, and uninstall.
 
-Ниже сохранена история функциональности исходной линии modxMCP, на которой основан MODX3 MCP.
+### Migration to MODX Revolution 3
+
+- The project now has its own identity: **MODX3 MCP**, package **MODX3MCP**, and Node.js package `modx3-mcp`. The internal `modxmcp` namespace is kept for compatibility.
+- The server side now uses native MODX Revolution 3 bootstrap, MODX/xPDO namespaces, and MODX 3 processor routing.
+- Supported versions are limited to **MODX Revolution >= 3.0.0 and < 4.0.0**.
+- Processor compatibility is checked against MODX Revolution 3.2.2-pl, 3.2.4-pl, and the current 3.x branch.
+
+### Installation and upgrades
+
+- The transport package and command-line installer were made portable and no longer depend on one specific site layout.
+- The command-line installer creates and updates manager menu entries while preserving existing settings and the API token.
+- New files are prepared in temporary directories first. Live directories are replaced only after preparation succeeds; on failure, the previous version is restored.
+- Namespace, menu, settings, and token changes are handled in one xPDO transaction and are rolled back together with the files if installation does not complete.
+- Transport-package uninstall removes manager menu entries, `modxmcp.*` settings, the namespace, and component files.
+- A parity check was added for transport and command-line installation. It compares all 16 `modxmcp.*` definitions, including default value, field type, and settings area.
+- The transport-package builder is now CLI-only.
+
+### Security
+
+- `service_user_id=0` now selects only an active MODX user with `sudo` permission. The old dependency on user ID 1 was removed.
+- A manually configured service user must also be active and have `sudo` permission.
+- `auto_static` is disabled by default.
+- HTTPS is required by default. Trusting `X-Forwarded-Proto` requires an explicit opt-in setting.
+- API tokens are generated only with `random_bytes()`; weaker fallback methods were removed.
+- The API token can no longer be passed in the query string, so it does not leak into URLs, access logs, or browser history.
+- HTTPS checks happen before the health GET response; request-body size is checked before and after reading the body.
+- The transaction helper rolls back on any `Throwable`.
+- Manager screens require the `settings` permission; `{core_path}` handling in the manager connector was fixed.
+- `clear_tv_values` requires explicit confirmation, and the client creates a safety backup first.
+
+### TV values and write operations
+
+- Server actions `list_tv_values` and `clear_tv_values` were added for safer work with explicitly stored TV values.
+- Read/write classification was expanded: `list/get/search/read/view/check/describe/find/suggest` and dedicated read-only actions no longer take the project write lock or create unnecessary audit events.
+- Write operations still use the project lock to reduce the risk of conflicting parallel changes.
+
+### Auditing
+
+- The client supports the optional `MODX_MCP_AUDIT_HOOK`.
+- After a successful write operation, a trusted external program can receive JSON over standard input with operation data and paths to automatically created safety backups.
+- If no hook is configured, normal client behaviour does not change.
+- If the hook fails, the client reports a warning but does not turn an already successful site change into an error.
+
+### Release checks
+
+- Automated checks were added for installation portability and for consistency between client tools and server actions.
+- A full release workflow was added with `_build/release.smoke.sh` and `_build/smoke.endpoint.php`.
+- The workflow checks PHP syntax, build, installation, API access, CRUD operations, reinstall with settings preserved, clean uninstall, and a final install with read-only checks.
+- The API token is not printed in test logs.
+- Before 1.0.0 was released, a separate clean installation was tested on MODX Revolution 3.2.4-pl, including the MCP client, changes to test objects, reinstall with settings preserved, and complete component removal.
+
+## Original modxMCP feature history
+
+The original feature history below is kept in English from the [**modxMCP**](https://github.com/dampilov94/mcp-component) project by [**dampilov94**](https://github.com/dampilov94).
+
+This section belongs to the original project line on which MODX3 MCP is based. The original wording is preserved so that technical details and release-history phrasing are not changed by translation.
 
 ## 1.9.0 (2026-08-10)
 
@@ -164,3 +201,4 @@ broad MODX management surface via the MCP client; capability groups are toggled 
 
 Versions are kept in sync across `_build/build.config.php`, `package.json`,
 `package-lock.json` and `modxMCP::VERSION` (CI-enforced).
+
