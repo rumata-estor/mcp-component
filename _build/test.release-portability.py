@@ -269,6 +269,21 @@ if "'modxmcp'" not in builder or "'modxmcp_graph'" not in builder:
     fail("transport builder: both manager menu entries are required")
 
 headless_text = (ROOT / "_build/install.headless.php").read_text()
+
+for cli_name, cli_text in {
+    "build.transport.php": builder,
+    "install.transport.php": transport_installer,
+    "install.headless.php": headless_text,
+}.items():
+    for needle, message in {
+        "MODX_DOCUMENT_ROOT": "must support explicit MODX_DOCUMENT_ROOT",
+        "$_SERVER['DOCUMENT_ROOT']": "must restore DOCUMENT_ROOT for CLI bootstrap",
+        "core' . DIRECTORY_SEPARATOR . 'vendor'": "must infer MODX web root using core/vendor/autoload.php",
+        "MODX bootstrap failed": "must fail closed when MODX autoload cannot be resolved",
+    }.items():
+        if needle not in cli_text:
+            fail(f"{cli_name}: {message}")
+
 if "getVersionData()" not in headless_text or "version_compare($fullVersion, '3.0.0', '<')" not in headless_text or "version_compare($fullVersion, '4.0.0', '>=')" not in headless_text:
     fail("headless installer: explicit MODX 3.x preflight guard missing")
 for needle, message in {
