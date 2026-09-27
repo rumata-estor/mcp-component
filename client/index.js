@@ -12,6 +12,7 @@ const axios = require("axios");
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
+const { spawnSync } = require("child_process");
 
 function loadLocalEnv() {
   const candidates = [
@@ -55,6 +56,7 @@ const SITE_ID = process.env.MODX_MCP_SITE_ID || "";
 const MANAGER_ROOT = process.env.MODX_MCP_MANAGER_ROOT || "";
 const BACKUP_KEEP_COUNT = Math.max(1, Number(process.env.MODX_MCP_BACKUP_KEEP_COUNT || 20));
 const SKIP_AUTO_BACKUP = process.env.MODX_MCP_SKIP_AUTO_BACKUP === "1";
+const AUDIT_HOOK = String(process.env.MODX_MCP_AUDIT_HOOK || "").trim();
 
 
 const PROJECT_LOCK_READ_ONLY_TOOLS = new Set([
@@ -137,8 +139,22 @@ function projectLockRemove(lockDir) {
   } catch (_) {}
 }
 
+const PROJECT_LOCK_READ_ONLY_EXACT = new Set([
+  "modx_help",
+  "modx_system_info",
+  "modx_project_overview",
+  "modx_dependency_graph",
+  "modx_virtualpage_resolve_route",
+]);
+
+const PROJECT_LOCK_READ_OPERATION = /(?:^|_)(?:list|get|search|read|view|check|describe|find|suggest)(?:_|$)/;
+
 function isProjectMutationTool(name) {
-  return String(name || "").startsWith("modx_") && !PROJECT_LOCK_READ_ONLY_TOOLS.has(name);
+  const tool = String(name || "");
+  if (!tool.startsWith("modx_")) return false;
+  if (PROJECT_LOCK_READ_ONLY_TOOLS.has(tool) || PROJECT_LOCK_READ_ONLY_EXACT.has(tool)) return false;
+  const tail = tool.slice("modx_".length);
+  return !PROJECT_LOCK_READ_OPERATION.test(tail);
 }
 
 function acquireProjectLockForTool(name) {
@@ -200,6 +216,65 @@ function releaseProjectLock(lock) {
   const owner = projectLockOwner(lock.lockDir);
   if (owner.token === lock.token) {
     projectLockRemove(lock.lockDir);
+  }
+}
+
+const AUDIT_READ_OPERATION = /(?:^|_)(?:list|get|search|read|view|check|describe|find|suggest)(?:_|$)/;
+const AUDIT_WRITE_OPERATION = /(?:^|_)(?:create|update|delete|assign|unassign|replace|bulk|duplicate|undelete|empty|clear|reorder|refresh|regenerate|revert|set|add|remove|grant|revoke|install|uninstall|make|edit|run|rename)(?:_|$)/;
+const AUDIT_NO_RECORD_TOOLS = new Set([
+  "modx_clear_cache",
+  "modx_flush_permissions",
+  "modx_remove_locks",
+]);
+
+function shouldInvokeAuditHook(name, args) {
+  if (!AUDIT_HOOK || !isProjectMutationTool(name)) return false;
+  if (AUDIT_NO_RECORD_TOOLS.has(name)) return false;
+  const tail = String(name || "").replace(/^modx_/, "");
+  if (AUDIT_READ_OPERATION.test(tail)) return false;
+  if (args && args.dry_run === true) return false;
+  if (name === "modx_clear_tv_values" && (!args || args.confirm !== true)) return false;
+  return AUDIT_WRITE_OPERATION.test(tail);
+}
+
+function runMutationAuditHook(name, args, result, backupFiles) {
+  if (!shouldInvokeAuditHook(name, args || {})) return;
+  const payload = {
+    format: 1,
+    site_id: SITE_ID,
+    tool: name,
+    at: new Date().toISOString(),
+    args: args || {},
+    result: result || null,
+    backup_files: Array.isArray(backupFiles) ? backupFiles.filter(Boolean) : [],
+    actor: {
+      source: process.env.AGENT_ACTOR_SOURCE || "mcp",
+      id: process.env.AGENT_ACTOR_ID || "unknown",
+      name: process.env.AGENT_ACTOR_NAME || "",
+      model: process.env.AGENT_MODEL || "unknown",
+    },
+  };
+  try {
+    const hook = spawnSync(AUDIT_HOOK, [], {
+      input: JSON.stringify(payload),
+      encoding: "utf8",
+      timeout: 5000,
+      maxBuffer: 1024 * 1024,
+      env: process.env,
+    });
+    if (hook.error) {
+      console.error(`modxMCP: audit hook warning: ${hook.error.message}`);
+      return;
+    }
+    if (hook.status !== 0) {
+      const err = String(hook.stderr || "").trim();
+      console.error(`modxMCP: audit hook warning: exit ${hook.status}${err ? " — " + err : ""}`);
+      return;
+    }
+    const out = String(hook.stdout || "").trim();
+    if (out) console.error(`modxMCP: audit hook: ${out}`);
+  } catch (e) {
+    console.error(`modxMCP: audit hook warning: ${e.message}`);
   }
 }
 
@@ -2273,10 +2348,11 @@ function stringifyApiResult(result) {
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
   let projectLock = null;
+  let safetyBackups = [];
 
   try {
     projectLock = acquireProjectLockForTool(name);
-    await autoBackupForMutation(name, args || {});
+    safetyBackups = await autoBackupForMutation(name, args || {});
 
     if (name === "modx_list_elements") {
       const result = await modxApiRequest({
@@ -2320,6 +2396,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         type: args.type,
         data: args,
       });
+      runMutationAuditHook(name, args || {}, result, safetyBackups);
       return {
         content: [{ type: "text", text: stringifyApiResult(result) }],
       };
@@ -2331,6 +2408,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         action,
         data: args,
       });
+      runMutationAuditHook(name, args || {}, result, safetyBackups);
       return {
         content: [{ type: "text", text: stringifyApiResult(result) }],
       };

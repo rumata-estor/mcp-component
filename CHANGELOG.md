@@ -23,6 +23,8 @@
 - `service_user_id=0` выбирает только active+sudo пользователя; явно заданный service user также обязан уже быть active+sudo.
 - Добавлены серверные `list_tv_values` / `clear_tv_values` для безопасной работы с явно сохранёнными TV values; destructive clear требует confirm и клиент делает safety backup.
 - Добавлен `_build/release.smoke.sh` + `_build/smoke.endpoint.php`: автоматический PHP lint → build → install → endpoint/CRUD smoke → settings-preservation reinstall → clean uninstall → final install/read-only smoke без вывода API token.
+- Клиент поддерживает необязательный `MODX_MCP_AUDIT_HOOK`: после успешной mutating-операции доверенная внешняя команда получает JSON операции и пути safety backup через stdin; отсутствие hook не меняет обычную работу клиента, а ошибка hook даёт warning без ложного отката уже выполненной записи.
+- Project lock/read-only classification расширена для дополнительных групп: `list/get/search/read/view/check/describe/find/suggest` и отдельные read actions больше не считаются write-операциями и не создают лишние lock/audit события.
 
 ## История исходной функциональности modxMCP
 
