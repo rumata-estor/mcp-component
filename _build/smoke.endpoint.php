@@ -35,30 +35,169 @@ if (!$config || !is_file($config)) {
     exit(2);
 }
 
+
+// Some MODX installations derive paths from $_SERVER['DOCUMENT_ROOT'] even in
+// config.core.php. CLI normally leaves it empty. Support an explicit root and
+// otherwise infer the MODX web root from config.core.php.
+$documentRoot = trim((string)getenv('MODX_DOCUMENT_ROOT'));
+if ($documentRoot !== '') {
+    $documentRoot = rtrim($documentRoot, '/\\');
+    if (!is_file($documentRoot . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'vendor' . DIRECTORY_SEPARATOR . 'autoload.php')) {
+        fwrite(STDERR, "MODX_DOCUMENT_ROOT does not look like a MODX web root: {$documentRoot}\n");
+        exit(2);
+    }
+    $_SERVER['DOCUMENT_ROOT'] = $documentRoot;
+} elseif (PHP_SAPI === 'cli' && empty($_SERVER['DOCUMENT_ROOT'])) {
+    $probe = dirname((string)(realpath($config) ?: $config));
+    for ($i = 0; $i < 12; $i++) {
+        $autoload = $probe . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'vendor' . DIRECTORY_SEPARATOR . 'autoload.php';
+        if (is_file($autoload)) {
+            $_SERVER['DOCUMENT_ROOT'] = rtrim($probe, '/\\');
+            break;
+        }
+        $parent = dirname($probe);
+        if ($parent === $probe) {
+            break;
+        }
+        $probe = $parent;
+    }
+}
+
 require_once $config;
-require_once MODX_CORE_PATH . 'vendor/autoload.php';
+if (!defined('MODX_CORE_PATH') || !is_file(rtrim(MODX_CORE_PATH, '/\\') . DIRECTORY_SEPARATOR . 'vendor' . DIRECTORY_SEPARATOR . 'autoload.php')) {
+    fwrite(STDERR, "MODX bootstrap failed: MODX_CORE_PATH/vendor/autoload.php not found. Set MODX_DOCUMENT_ROOT when config.core.php depends on DOCUMENT_ROOT.\n");
+    exit(2);
+}
+require_once rtrim(MODX_CORE_PATH, '/\\') . DIRECTORY_SEPARATOR . 'vendor' . DIRECTORY_SEPARATOR . 'autoload.php';
 
 $modx = modX::getInstance();
 $modx->initialize('mgr');
 
 $settingsHashOnly = in_array('--settings-hash', $argv, true);
 $readOnly = in_array('--read-only', $argv, true);
+$settingsExport = '';
+$settingsRestore = '';
+$settingsCompare = '';
+foreach (array_slice($argv, 1) as $arg) {
+    if (strpos($arg, '--settings-export=') === 0) {
+        $settingsExport = substr($arg, strlen('--settings-export='));
+    } elseif (strpos($arg, '--settings-restore=') === 0) {
+        $settingsRestore = substr($arg, strlen('--settings-restore='));
+    } elseif (strpos($arg, '--settings-compare=') === 0) {
+        $settingsCompare = substr($arg, strlen('--settings-compare='));
+    }
+}
 
 $settings = array();
-$query = $modx->newQuery(modSystemSetting::class);
-$query->where(array('namespace' => 'modxmcp'));
-$query->sortby('key', 'ASC');
-foreach ($modx->getCollection(modSystemSetting::class, $query) as $setting) {
+foreach ($modx->getCollection(modSystemSetting::class, array('namespace' => 'modxmcp')) as $setting) {
     $settings[(string)$setting->get('key')] = (string)$setting->get('value');
 }
-if (count($settings) !== 16) {
-    fwrite(STDERR, "Expected 16 modxmcp settings, found " . count($settings) . ".\n");
-    exit(3);
+ksort($settings, SORT_STRING);
+
+if ($settingsExport !== '') {
+    if (count($settings) > 16) {
+        fwrite(STDERR, "Refusing settings snapshot with unexpected extra modxmcp settings: found " . count($settings) . ".\n");
+        exit(3);
+    }
+    foreach (array_keys($settings) as $key) {
+        if (strpos((string)$key, 'modxmcp.') !== 0) {
+            fwrite(STDERR, "Unexpected setting key in snapshot source.\n");
+            exit(3);
+        }
+    }
+    $payload = json_encode(array(
+        'format' => 'modx3mcp-settings-v1',
+        'settings' => $settings,
+    ), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    if ($payload === false || file_put_contents($settingsExport, $payload, LOCK_EX) === false) {
+        fwrite(STDERR, "Could not write settings snapshot.\n");
+        exit(3);
+    }
+    @chmod($settingsExport, 0600);
+    echo 'SETTINGS_SNAPSHOT_OK count=' . count($settings) . PHP_EOL;
+    exit(0);
+}
+
+if ($settingsRestore !== '') {
+    $raw = @file_get_contents($settingsRestore);
+    $snapshot = $raw !== false ? json_decode($raw, true) : null;
+    if (!is_array($snapshot) || ($snapshot['format'] ?? '') !== 'modx3mcp-settings-v1' || !isset($snapshot['settings']) || !is_array($snapshot['settings'])) {
+        fwrite(STDERR, "Invalid settings snapshot.\n");
+        exit(3);
+    }
+    $restore = $snapshot['settings'];
+    if (count($restore) === 0) {
+        echo "SETTINGS_RESTORE_SKIP empty-snapshot\n";
+        exit(0);
+    }
+    if (count($restore) > 16) {
+        fwrite(STDERR, "Invalid settings snapshot count: " . count($restore) . ".\n");
+        exit(3);
+    }
+
+    $modx->beginTransaction();
+    try {
+        foreach ($restore as $key => $value) {
+            if (strpos((string)$key, 'modxmcp.') !== 0) {
+                throw new RuntimeException("Unexpected setting key in snapshot.");
+            }
+            $setting = $modx->getObject(modSystemSetting::class, array('key' => $key, 'namespace' => 'modxmcp'));
+            if (!$setting) {
+                throw new RuntimeException("Setting missing during restore: {$key}");
+            }
+            $setting->set('value', (string)$value);
+            if (!$setting->save()) {
+                throw new RuntimeException("Could not restore setting: {$key}");
+            }
+        }
+        if ($modx->commit() === false) {
+            throw new RuntimeException('Settings restore transaction commit failed.');
+        }
+    } catch (Throwable $e) {
+        $modx->rollback();
+        fwrite(STDERR, "Settings restore failed: " . $e->getMessage() . "\n");
+        exit(3);
+    }
+    if ($modx->getCacheManager()) {
+        $modx->getCacheManager()->refresh();
+    }
+    echo 'SETTINGS_RESTORE_OK count=' . count($restore) . PHP_EOL;
+    exit(0);
+}
+
+if ($settingsCompare !== '') {
+    $raw = @file_get_contents($settingsCompare);
+    $snapshot = $raw !== false ? json_decode($raw, true) : null;
+    if (!is_array($snapshot) || ($snapshot['format'] ?? '') !== 'modx3mcp-settings-v1' || !isset($snapshot['settings']) || !is_array($snapshot['settings'])) {
+        fwrite(STDERR, "Invalid settings snapshot for comparison.\n");
+        exit(3);
+    }
+    $mismatch = array();
+    foreach ($snapshot['settings'] as $key => $value) {
+        if (!array_key_exists($key, $settings) || (string)$settings[$key] !== (string)$value) {
+            $mismatch[] = (string)$key;
+        }
+    }
+    if (!empty($mismatch)) {
+        fwrite(STDERR, "SETTINGS_COMPARE_FAILED keys=" . implode(',', $mismatch) . "\n");
+        exit(3);
+    }
+    echo 'SETTINGS_COMPARE_OK count=' . count($snapshot['settings']) . PHP_EOL;
+    exit(0);
 }
 
 if ($settingsHashOnly) {
+    if (count($settings) > 16) {
+        fwrite(STDERR, "Unexpected modxmcp settings count: " . count($settings) . ".\n");
+        exit(3);
+    }
     echo 'SETTINGS_HASH=' . hash('sha256', json_encode($settings, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)) . PHP_EOL;
     exit(0);
+}
+
+if (count($settings) !== 16) {
+    fwrite(STDERR, "Expected 16 modxmcp settings, found " . count($settings) . ".\n");
+    exit(3);
 }
 
 $token = isset($settings['modxmcp.api_token']) ? trim($settings['modxmcp.api_token']) : '';
