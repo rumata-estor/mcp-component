@@ -220,9 +220,18 @@ if (!empty($options['show-token']) && $token !== '') {
 }
 echo 'file assets/api.php: ' . (is_file($apiFile) ? 'yes' : 'NO') . PHP_EOL;
 echo 'file core/model: ' . (is_file($modelFile) ? 'yes' : 'NO') . PHP_EOL;
+$deployedVersion = '';
+if (is_file($modelFile)) {
+    $modelSource = @file_get_contents($modelFile);
+    if (is_string($modelSource) && preg_match("/const\s+VERSION\s*=\s*'([^']+)'/", $modelSource, $m)) {
+        $deployedVersion = $m[1];
+    }
+}
+echo 'deployed model version: ' . ($deployedVersion !== '' ? $deployedVersion : 'UNKNOWN') . PHP_EOL;
 
 if (!$ns || $countSettings !== $expectedSettings || !$rootMenu || !$graphMenu ||
-    !$enabledSetting || $token === '' || !is_file($apiFile) || !is_file($modelFile)) {
+    !$enabledSetting || $token === '' || !is_file($apiFile) || !is_file($modelFile) ||
+    $deployedVersion !== PKG_VERSION) {
     fwrite(STDERR, "Transport verification FAILED.\n");
     exit(6);
 }

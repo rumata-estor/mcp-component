@@ -12,6 +12,8 @@ Patch release fixing empty-template assignment in bulk resource operations.
 - Server-side validation now distinguishes a missing parameter from the integer `0` and rejects only absent, null, empty, non-integer, or negative template values.
 - The MCP tool schema now declares `template` as an integer with `minimum: 0`, so clients and agents can pass the empty-template value correctly.
 - Release regression checks now guard the server validation and client schema against reintroducing the `template=0` bug.
+- Transport upgrades now recover when an earlier install left MODX3 MCP files without the owner-write bit; package-owned files/directories are installed with explicit `0644`/`0755` permissions.
+- The transport verifier now checks that the deployed model version actually matches the package version, and endpoint smoke tests support `MODX_MCP_SMOKE_SITE_URL` for test hosts whose MODX `site_url` points elsewhere.
 
 ## 1.0.0 (2026-09-27)
 
