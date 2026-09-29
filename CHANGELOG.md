@@ -2,6 +2,17 @@
 
 # MODX3 MCP — Changelog
 
+## 1.0.1 (2026-09-29)
+
+Patch release fixing empty-template assignment in bulk resource operations.
+
+### Fixed
+
+- `modx_bulk_resources` with `operation: "set_template"` now accepts `template: 0`, which is the valid MODX value for a resource with no assigned template.
+- Server-side validation now distinguishes a missing parameter from the integer `0` and rejects only absent, null, empty, non-integer, or negative template values.
+- The MCP tool schema now declares `template` as an integer with `minimum: 0`, so clients and agents can pass the empty-template value correctly.
+- Release regression checks now guard the server validation and client schema against reintroducing the `template=0` bug.
+
 ## 1.0.0 (2026-09-27)
 
 The first stable release of the **MODX3 MCP** line for MODX Revolution 3.x, based on the original [**modxMCP**](https://github.com/dampilov94/mcp-component) project by [**dampilov94**](https://github.com/dampilov94).

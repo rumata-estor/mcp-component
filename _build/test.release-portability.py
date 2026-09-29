@@ -7,7 +7,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 errors = []
 
-EXPECTED_VERSION = "1.0.0"
+EXPECTED_VERSION = "1.0.1"
 EXPECTED_NODE_NAME = "modx3-mcp"
 EXPECTED_TRANSPORT_NAME = "MODX3MCP"
 
@@ -186,6 +186,13 @@ if cap_pos < 0 or dispatch_pos < 0 or cap_pos > dispatch_pos:
     fail("model: capability enforcement must run before action dispatch")
 if "modxmcp.allow_run_processor', null, false" not in model_text:
     fail("model: run_processor must remain independently gated off by default")
+if "empty($data['template'])" in model_text:
+    fail("model: bulk set_template must not treat template=0 as missing")
+if "array_key_exists('template', $data)" not in model_text or "(int) $data['template'] >= 0" not in model_text:
+    fail("model: bulk set_template must explicitly allow non-negative template ids including 0")
+client_text = (ROOT / "client/index.js").read_text()
+if 'template: { type: "integer", minimum: 0' not in client_text:
+    fail("client: bulk set_template schema must advertise template id 0 as valid")
 
 settings_resolver = (ROOT / "_build/resolvers/resolve.settings.php").read_text()
 for needle, message in {

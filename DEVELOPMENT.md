@@ -55,7 +55,7 @@ The basic setup is:
 5. Start with read-only operations.
 6. Enable write or dangerous operations only when they are actually needed.
 
-For stable use, prefer a specific release such as `v1.0.0` instead of the current development branch.
+For stable use, prefer a specific release such as `v1.0.1` instead of the current development branch.
 
 Example MCP client configuration:
 
@@ -66,7 +66,7 @@ Example MCP client configuration:
       "command": "npx",
       "args": [
         "-y",
-        "github:rumata-estor/modx3-mcp#v1.0.0"
+        "github:rumata-estor/modx3-mcp#v1.0.1"
       ],
       "env": {
         "MODX_MCP_SITE_URL": "https://example.com/assets/components/modxmcp/api.php",
@@ -668,7 +668,7 @@ The Node.js side compares its own version with the site API version and warns if
 On production, use a fixed release:
 
 ```text
-github:rumata-estor/modx3-mcp#v1.0.0
+github:rumata-estor/modx3-mcp#v1.0.1
 ```
 
 instead of a development branch.
