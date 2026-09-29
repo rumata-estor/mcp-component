@@ -8,7 +8,7 @@
 
 The project is based on the original [**modxMCP**](https://github.com/dampilov94/mcp-component), created by [**dampilov94**](https://github.com/dampilov94). MODX3 MCP has been substantially reworked for MODX Revolution 3.x: the MODX API layer was updated, the operation set was expanded, safety mechanisms were strengthened, and tools for structure and dependency analysis were added.
 
-**Version [1.0.0](https://github.com/rumata-estor/modx3-mcp/releases/tag/v1.0.0) · MODX Revolution 3.x · MIT**
+**Version [1.0.1](https://github.com/rumata-estor/modx3-mcp/releases/tag/v1.0.1) · MODX Revolution 3.x · MIT**
 
 ## The idea
 
@@ -201,9 +201,9 @@ After that, you can move to more complex workflows and enable only the capabilit
 
 For a normal installation, use the ready-made transport package:
 
-`modx3mcp-1.0.0-pl.transport.zip`
+`modx3mcp-1.0.1-pl.transport.zip`
 
-It is available in the [MODX3 MCP 1.0.0 release](https://github.com/rumata-estor/modx3-mcp/releases/tag/v1.0.0) and can be installed with the standard MODX package manager.
+It is available in the [MODX3 MCP 1.0.1 release](https://github.com/rumata-estor/modx3-mcp/releases/tag/v1.0.1) and can be installed with the standard MODX package manager.
 
 The installation creates the MODX3 MCP component, `modxmcp.*` system settings, namespace, manager menu items, API endpoint, and dependency-graph screen. The API token is generated automatically on first install.
 
@@ -229,7 +229,7 @@ The installer is CLI-only and does not create a browser-accessible installation 
 
 ## Configure an MCP client
 
-For the stable 1.0.0 release:
+For the stable 1.0.1 release:
 
 ```json
 {
@@ -238,7 +238,7 @@ For the stable 1.0.0 release:
       "command": "npx",
       "args": [
         "-y",
-        "github:rumata-estor/modx3-mcp#v1.0.0"
+        "github:rumata-estor/modx3-mcp#v1.0.1"
       ],
       "env": {
         "MODX_MCP_SITE_URL": "https://example.com/assets/components/modxmcp/api.php",
@@ -285,7 +285,7 @@ The original work and attribution are preserved in the project history and licen
 
 The project is distributed under the **MIT License**. See [LICENSE](LICENSE).
 
-Current stable release: **[MODX3 MCP 1.0.0](https://github.com/rumata-estor/modx3-mcp/releases/tag/v1.0.0)**.
+Current stable release: **[MODX3 MCP 1.0.1](https://github.com/rumata-estor/modx3-mcp/releases/tag/v1.0.1)**.
 
 The release includes the source archive, the MODX transport package, and a SHA-256 checksum file.
 

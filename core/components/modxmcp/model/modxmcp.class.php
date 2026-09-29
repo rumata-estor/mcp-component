@@ -8,7 +8,7 @@ if (!class_exists("ModxMCPClientException")) {
     class ModxMCPClientException extends Exception {}
 }
 class modxMCP {
-    const VERSION = '1.0.0';
+    const VERSION = '1.0.1';
     const VARIANT = 'modx3';
     public $modx;
     public $config =[];
@@ -1615,7 +1615,16 @@ class modxMCP {
         if (!$ids) { throw new ModxMCPClientException('bulk_resources: no targets — pass "ids" or a parent/context/query filter.'); }
         if (count($ids) > $limit) { $ids = array_slice($ids, 0, $limit); }
 
-        if ($op === 'set_template' && empty($data['template'])) { throw new ModxMCPClientException('bulk_resources: set_template requires "template".'); }
+        if ($op === 'set_template') {
+            $templateValid = array_key_exists('template', $data)
+                && $data['template'] !== null
+                && $data['template'] !== ''
+                && filter_var($data['template'], FILTER_VALIDATE_INT) !== false
+                && (int) $data['template'] >= 0;
+            if (!$templateValid) {
+                throw new ModxMCPClientException('bulk_resources: set_template requires "template" as a non-negative integer (0 = no template).');
+            }
+        }
         if ($op === 'move' && !isset($data['parent_to']) && empty($data['context_to'])) { throw new ModxMCPClientException('bulk_resources: move requires "parent_to" and/or "context_to".'); }
 
         $dry = !empty($data['dry_run']);

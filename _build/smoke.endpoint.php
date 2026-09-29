@@ -206,9 +206,13 @@ if ($token === '') {
     exit(4);
 }
 
-$siteUrl = rtrim((string)$modx->getOption('site_url'), '/');
+$siteUrl = trim((string)getenv('MODX_MCP_SMOKE_SITE_URL'));
+if ($siteUrl === '') {
+    $siteUrl = (string)$modx->getOption('site_url');
+}
+$siteUrl = rtrim($siteUrl, '/');
 if (!preg_match('~^https?://~i', $siteUrl)) {
-    fwrite(STDERR, "MODX site_url is not an absolute HTTP(S) URL: {$siteUrl}\n");
+    fwrite(STDERR, "Smoke-test site URL is not an absolute HTTP(S) URL: {$siteUrl}\n");
     exit(5);
 }
 $endpoint = $siteUrl . '/assets/components/modxmcp/api.php';

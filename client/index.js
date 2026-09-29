@@ -1572,7 +1572,7 @@ const toolDefinitions = [
         parent: { type: "number", description: "Filter: select children of this parent id." },
         context: { type: "string", description: "Filter: context key." },
         query: { type: "string", description: "Filter: pagetitle/alias/uri substring." },
-        template: { type: "number", description: "For set_template: the new template id." },
+        template: { type: "integer", minimum: 0, description: "For set_template: the new template id. Use 0 to assign no template (MODX empty template)." },
         parent_to: { type: "number", description: "For move: the new parent id." },
         context_to: { type: "string", description: "For move: the new context key." },
         dry_run: { type: "boolean", description: "Preview the change per resource without applying. Do this first." },

@@ -7,7 +7,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 errors = []
 
-EXPECTED_VERSION = "1.0.0"
+EXPECTED_VERSION = "1.0.1"
 EXPECTED_NODE_NAME = "modx3-mcp"
 EXPECTED_TRANSPORT_NAME = "MODX3MCP"
 
@@ -23,6 +23,7 @@ required_files = [
     "_build/build.transport.php",
     "_build/data/transport.settings.php",
     "_build/resolvers/resolve.token.php",
+    "_build/resolvers/resolve.permissions.php",
     "_build/resolvers/resolve.settings.php",
     "_build/install.headless.php",
     "_build/install.transport.php",
@@ -186,6 +187,13 @@ if cap_pos < 0 or dispatch_pos < 0 or cap_pos > dispatch_pos:
     fail("model: capability enforcement must run before action dispatch")
 if "modxmcp.allow_run_processor', null, false" not in model_text:
     fail("model: run_processor must remain independently gated off by default")
+if "empty($data['template'])" in model_text:
+    fail("model: bulk set_template must not treat template=0 as missing")
+if "array_key_exists('template', $data)" not in model_text or "(int) $data['template'] >= 0" not in model_text:
+    fail("model: bulk set_template must explicitly allow non-negative template ids including 0")
+client_text = (ROOT / "client/index.js").read_text()
+if 'template: { type: "integer", minimum: 0' not in client_text:
+    fail("client: bulk set_template schema must advertise template id 0 as valid")
 
 settings_resolver = (ROOT / "_build/resolvers/resolve.settings.php").read_text()
 for needle, message in {
@@ -209,6 +217,7 @@ for needle, message in {
     "$expectedSettings = 16": "transport verifier: exact 16-setting install check missing",
     "$rootMenu": "transport verifier: root menu install check missing",
     "$graphMenu": "transport verifier: graph menu install check missing",
+    "$deployedVersion !== PKG_VERSION": "transport verifier: deployed code version check missing",
     "exit(7)": "transport verifier: leftover artifacts must fail the uninstall test",
 }.items():
     if needle not in transport_installer:
@@ -226,6 +235,7 @@ for needle, message in {
     "SETTINGS_COMPARE_OK": "endpoint smoke settings comparison success marker missing",
     "SETTINGS_RESTORE_OK": "endpoint smoke settings restore success marker missing",
     "MODX_DOCUMENT_ROOT": "endpoint smoke portable CLI bootstrap missing",
+    "MODX_MCP_SMOKE_SITE_URL": "endpoint smoke URL override missing",
     "MCP_ENDPOINT_SMOKE_OK": "endpoint CRUD smoke success marker missing",
     "MCP_ENDPOINT_READ_ONLY_SMOKE_OK": "endpoint read-only smoke marker missing",
     "finally": "endpoint smoke must guarantee CRUD cleanup",
@@ -266,6 +276,9 @@ builder_requirements = {
     "resolve.token.php": "transport builder must attach token resolver",
     "resolve.integrations.php": "transport builder must attach integrations resolver",
     "resolve.settings.php": "transport builder must attach uninstall settings resolver",
+    "resolve.permissions.php": "transport builder must attach upgrade-permission resolver before file vehicles",
+    "'new_file_permissions' => '0644'": "transport builder must set explicit writable file permissions",
+    "'new_folder_permissions' => '0755'": "transport builder must set explicit directory permissions",
     "source_core": "transport builder must package core files",
     "source_assets": "transport builder must package assets files",
     "UPDATE_OBJECT => false": "transport settings must preserve admin-edited values on upgrade",

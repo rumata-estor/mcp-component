@@ -8,7 +8,7 @@
 
 Проект основан на оригинальном [**modxMCP**](https://github.com/dampilov94/mcp-component), автор исходного проекта — [**dampilov94**](https://github.com/dampilov94). MODX3 MCP существенно переработан для MODX Revolution 3.x: обновлён слой работы с API MODX, расширен набор операций, усилены механизмы безопасности и добавлен анализ структуры сайта и зависимостей.
 
-**Версия [1.0.0](https://github.com/rumata-estor/modx3-mcp/releases/tag/v1.0.0) · MODX Revolution 3.x · MIT**
+**Версия [1.0.1](https://github.com/rumata-estor/modx3-mcp/releases/tag/v1.0.1) · MODX Revolution 3.x · MIT**
 
 ## Идея проекта
 
@@ -201,9 +201,9 @@ MODX3 MCP предназначен для:
 
 Для обычной установки используйте готовый транспортный пакет:
 
-`modx3mcp-1.0.0-pl.transport.zip`
+`modx3mcp-1.0.1-pl.transport.zip`
 
-Он доступен в [релизе MODX3 MCP 1.0.0](https://github.com/rumata-estor/modx3-mcp/releases/tag/v1.0.0) и устанавливается стандартными средствами MODX.
+Он доступен в [релизе MODX3 MCP 1.0.1](https://github.com/rumata-estor/modx3-mcp/releases/tag/v1.0.1) и устанавливается стандартными средствами MODX.
 
 Установка создаёт компонент MODX3 MCP, системные настройки `modxmcp.*`, пространство имён, пункты меню менеджера, API и экран графа зависимостей. API-токен создаётся автоматически при первой установке.
 
@@ -229,7 +229,7 @@ MODX_CONFIG_CORE=/full/path/to/config.core.php php _build/install.headless.php
 
 ## Настройка MCP-клиента
 
-Для стабильной версии 1.0.0:
+Для стабильной версии 1.0.1:
 
 ```json
 {
@@ -238,7 +238,7 @@ MODX_CONFIG_CORE=/full/path/to/config.core.php php _build/install.headless.php
       "command": "npx",
       "args": [
         "-y",
-        "github:rumata-estor/modx3-mcp#v1.0.0"
+        "github:rumata-estor/modx3-mcp#v1.0.1"
       ],
       "env": {
         "MODX_MCP_SITE_URL": "https://example.com/assets/components/modxmcp/api.php",
@@ -285,7 +285,7 @@ MODX3 MCP создан на основе открытого проекта [**mo
 
 Проект распространяется по лицензии **MIT**. См. [LICENSE](LICENSE).
 
-Актуальный стабильный релиз: **[MODX3 MCP 1.0.0](https://github.com/rumata-estor/modx3-mcp/releases/tag/v1.0.0)**.
+Актуальный стабильный релиз: **[MODX3 MCP 1.0.1](https://github.com/rumata-estor/modx3-mcp/releases/tag/v1.0.1)**.
 
 В релизе доступны исходный архив, транспортный пакет MODX и файл с контрольными суммами SHA-256.
 

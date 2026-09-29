@@ -122,8 +122,15 @@ if (is_array($settings) && !empty($settings)) {
         xPDOTransport::PRESERVE_KEYS => true,
         xPDOTransport::UPDATE_OBJECT => false, // do not overwrite admin-edited settings on upgrade
     );
+    $firstSettingVehicle = true;
     foreach ($settings as $setting) {
         $vehicle = $builder->createVehicle($setting, $attributes);
+        if ($firstSettingVehicle) {
+            // Runs before the file vehicles so upgrades can replace package files even on
+            // hosts where an earlier install left them without the owner-write bit.
+            $vehicle->resolve('php', array('source' => $sources['resolvers'] . 'resolve.permissions.php'));
+            $firstSettingVehicle = false;
+        }
         $builder->putVehicle($vehicle);
     }
     $modx->log(modX::LOG_LEVEL_INFO, 'Packaged ' . count($settings) . ' system settings.');
@@ -179,7 +186,11 @@ $coreVehicle = $builder->createVehicle(
         'source' => $sources['source_core'],
         'target' => "return MODX_CORE_PATH . 'components/';",
     ),
-    array('vehicle_class' => xPDOFileVehicle::class)
+    array(
+        'vehicle_class' => xPDOFileVehicle::class,
+        'new_file_permissions' => '0644',
+        'new_folder_permissions' => '0755',
+    )
 );
 $builder->putVehicle($coreVehicle);
 
@@ -189,7 +200,11 @@ $assetsVehicle = $builder->createVehicle(
         'source' => $sources['source_assets'],
         'target' => "return MODX_ASSETS_PATH . 'components/';",
     ),
-    array('vehicle_class' => xPDOFileVehicle::class)
+    array(
+        'vehicle_class' => xPDOFileVehicle::class,
+        'new_file_permissions' => '0644',
+        'new_folder_permissions' => '0755',
+    )
 );
 $assetsVehicle->resolve('php', array('source' => $sources['resolvers'] . 'resolve.token.php'));
 $assetsVehicle->resolve('php', array('source' => $sources['resolvers'] . 'resolve.integrations.php'));
