@@ -74,6 +74,9 @@ require_once rtrim(MODX_CORE_PATH, '/\\') . DIRECTORY_SEPARATOR . 'vendor' . DIR
 
 $modx = modX::getInstance();
 $modx->initialize('mgr');
+if (PHP_SAPI === 'cli' && (!isset($_SESSION) || !is_array($_SESSION))) {
+    $_SESSION = array();
+}
 $modx->setLogLevel(modX::LOG_LEVEL_INFO);
 $modx->setLogTarget('ECHO');
 
@@ -454,7 +457,7 @@ echo "Manager menu created/updated: yes\n";
 echo "Core files: {$targetCore}\n";
 echo "Assets files: {$targetAssets}\n";
 echo "Endpoint: {$endpoint}\n";
-$showToken = $tokenGenerated || in_array('--show-token', $argv, true);
+$showToken = in_array('--show-token', $argv, true);
 if ($showToken) {
     echo "Token: {$token}\n";
 } else {

@@ -18,6 +18,7 @@ required_files = [
     "assets/components/modxmcp/api.php",
     "assets/components/modxmcp/connector.php",
     "core/components/modxmcp/model/modxmcp.class.php",
+    "core/components/modxmcp/endpoint/api.common.php",
     "core/components/modxmcp/controllers/index.class.php",
     "core/components/modxmcp/processors/mgr/getstatus.class.php",
     "_build/build.transport.php",
@@ -77,9 +78,9 @@ for path in ROOT.rglob("*"):
     text = path.read_text(errors="ignore")
     rel = path.relative_to(ROOT)
     forbidden = [
-        ("test.alex-palochkin.ru", "test-site domain"),
-        ("130.17.9.68", "deployment-specific IP"),
-        ("/home/codexbot", "deployment-specific home path"),
+        ("test." + "alex-palochkin.ru", "test-site domain"),
+        ("130.17." + "9.68", "deployment-specific IP"),
+        ("/home/" + "codexbot", "deployment-specific home path"),
     ]
     for needle, label in forbidden:
         if needle in text:
@@ -198,11 +199,11 @@ if 'template: { type: "integer", minimum: 0' not in client_text:
 settings_resolver = (ROOT / "_build/resolvers/resolve.settings.php").read_text()
 for needle, message in {
     "ACTION_UNINSTALL": "resolve.settings.php: uninstall action guard missing",
-    "modSystemSetting::class": "resolve.settings.php: modxmcp settings cleanup missing",
+    "removeCollection($settingClass": "resolve.settings.php: modxmcp settings cleanup missing",
     "'namespace' => 'modxmcp'": "resolve.settings.php: cleanup must be scoped to modxmcp namespace",
-    "modMenu::class": "resolve.settings.php: manager-menu cleanup missing",
+    "getObject($menuClass": "resolve.settings.php: manager-menu cleanup missing",
     "'modxmcp_graph', 'modxmcp'": "resolve.settings.php: both manager menus must be cleaned child-first",
-    "modNamespace::class": "resolve.settings.php: namespace cleanup missing",
+    "getObject($namespaceClass": "resolve.settings.php: namespace cleanup missing",
 }.items():
     if needle not in settings_resolver:
         fail(message)
@@ -337,7 +338,18 @@ for menu_key in ["'modxmcp'", "'modxmcp_graph'"]:
     if menu_key not in headless_text:
         fail(f"headless installer: manager menu missing {menu_key}")
 
-api = (ROOT / "assets/components/modxmcp/api.php").read_text()
+api_wrapper = (ROOT / "assets/components/modxmcp/api.php").read_text()
+common_endpoint_path = ROOT / "core/components/modxmcp/endpoint/api.common.php"
+if "endpoint/api.common.php" in api_wrapper:
+    if not common_endpoint_path.is_file():
+        fail("api.php: platform wrapper references missing endpoint/api.common.php")
+        api = api_wrapper
+    else:
+        api = common_endpoint_path.read_text()
+        if "modxmcpVariant" not in api_wrapper:
+            fail("api.php: platform wrapper must declare modxmcpVariant before common endpoint")
+else:
+    api = api_wrapper
 connector = (ROOT / "assets/components/modxmcp/connector.php").read_text()
 for controller_rel in [
     "core/components/modxmcp/controllers/index.class.php",

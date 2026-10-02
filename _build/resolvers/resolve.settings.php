@@ -1,50 +1,59 @@
 <?php
-
-use MODX\Revolution\modMenu;
-use MODX\Revolution\modNamespace;
-use MODX\Revolution\modSystemSetting;
-use MODX\Revolution\modX;
-use xPDO\Transport\xPDOTransport;
-use xPDO\xPDO;
-
 /**
- * Keep administrator-edited modxmcp.* values intact on install/upgrade, but remove
- * the component's settings on an explicit transport-package uninstall.
+ * Preserve administrator-edited settings on install/upgrade and remove all
+ * modxMCP-owned settings/menu/namespace records on explicit uninstall.
+ * Shared by MODX 2 and MODX 3.
  */
 $modx = null;
 foreach (array('modx', 'transport', 'object') as $__v) {
-    if (isset($$__v) && is_object($$__v)) {
-        if ($$__v instanceof modX) { $modx = $$__v; break; }
-        if (isset($$__v->xpdo) && $$__v->xpdo instanceof xPDO) { $modx = $$__v->xpdo; break; }
+    if (!isset($$__v) || !is_object($$__v)) { continue; }
+    $candidate = $$__v;
+    if (is_a($candidate, 'modX') || is_a($candidate, 'MODX\\Revolution\\modX')) {
+        $modx = $candidate; break;
+    }
+    if (isset($candidate->xpdo) && is_object($candidate->xpdo)
+        && (is_a($candidate->xpdo, 'xPDO') || is_a($candidate->xpdo, 'xPDO\\xPDO'))) {
+        $modx = $candidate->xpdo; break;
     }
 }
-if (!$modx && isset($GLOBALS['modx']) && $GLOBALS['modx'] instanceof modX) {
+if (!$modx && isset($GLOBALS['modx']) && is_object($GLOBALS['modx'])
+    && (is_a($GLOBALS['modx'], 'modX') || is_a($GLOBALS['modx'], 'MODX\\Revolution\\modX'))) {
     $modx = $GLOBALS['modx'];
 }
-if (!$modx) {
-    return true;
-}
+if (!$modx) { return true; }
 
-$action = isset($options[xPDOTransport::PACKAGE_ACTION]) ? $options[xPDOTransport::PACKAGE_ACTION] : '';
-if ($action === xPDOTransport::ACTION_UNINSTALL) {
-    // Remove the child menu first, then the parent.
+$transportClass = class_exists('xPDO\\Transport\\xPDOTransport') ? 'xPDO\\Transport\\xPDOTransport' : 'xPDOTransport';
+$packageActionKey = constant($transportClass . '::PACKAGE_ACTION');
+$actionUninstall = constant($transportClass . '::ACTION_UNINSTALL');
+$action = isset($options[$packageActionKey]) ? $options[$packageActionKey] : '';
+
+if ($action === $actionUninstall) {
+    $versionData = method_exists($modx, 'getVersionData') ? $modx->getVersionData() : array();
+    $isModx3 = isset($versionData['version']) && (int)$versionData['version'] >= 3;
+    $menuClass = $isModx3 ? 'MODX\\Revolution\\modMenu' : 'modMenu';
+    $settingClass = $isModx3 ? 'MODX\\Revolution\\modSystemSetting' : 'modSystemSetting';
+    $namespaceClass = $isModx3 ? 'MODX\\Revolution\\modNamespace' : 'modNamespace';
+
+    $logClass = get_class($modx);
+    $logError = defined($logClass . '::LOG_LEVEL_ERROR') ? constant($logClass . '::LOG_LEVEL_ERROR') : 3;
+
     foreach (array('modxmcp_graph', 'modxmcp') as $menuText) {
-        $menu = $modx->getObject(modMenu::class, array('text' => $menuText));
+        $menu = $modx->getObject($menuClass, array('text' => $menuText));
         if ($menu && !$menu->remove()) {
-            $modx->log(modX::LOG_LEVEL_ERROR, "[MODX3 MCP] Could not remove manager menu {$menuText} during uninstall.");
+            $modx->log($logError, "[modxMCP] Could not remove manager menu {$menuText} during uninstall.");
             return false;
         }
     }
 
-    $removed = $modx->removeCollection(modSystemSetting::class, array('namespace' => 'modxmcp'));
+    $removed = $modx->removeCollection($settingClass, array('namespace' => 'modxmcp'));
     if ($removed === false) {
-        $modx->log(modX::LOG_LEVEL_ERROR, '[MODX3 MCP] Could not remove modxmcp system settings during uninstall.');
+        $modx->log($logError, '[modxMCP] Could not remove modxmcp system settings during uninstall.');
         return false;
     }
 
-    $namespace = $modx->getObject(modNamespace::class, array('name' => 'modxmcp'));
+    $namespace = $modx->getObject($namespaceClass, array('name' => 'modxmcp'));
     if ($namespace && !$namespace->remove()) {
-        $modx->log(modX::LOG_LEVEL_ERROR, '[MODX3 MCP] Could not remove modxmcp namespace during uninstall.');
+        $modx->log($logError, '[modxMCP] Could not remove modxmcp namespace during uninstall.');
         return false;
     }
 
