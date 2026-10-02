@@ -141,6 +141,7 @@ Filesystem media-source reads remain disabled on the sandbox by `modxmcp.allow_r
 - Live miniShop2 mutation parity: PASS, 12/12 actions; positive create paths were transactionally rolled back and real orders/products were not modified.
 - Live final mutation parity: PASS, bulk_resources and replace_across both match legacy for dry-run and real writes on temporary test objects.
 - Full live regression: PASS, all 14 live parity suites completed with exit code 0 on the final Runtime.
+- Two globally destructive actions were not invoked live: empty_recycle_bin (the sandbox had a pre-existing deleted resource) and regenerate_token (to preserve the active API token); both remain covered by modular registration, static contract checks, and legacy-equivalent implementation review.
 - Live Package-management mutation parity: PASS, 5/5 actions; package install/uninstall tested only on non-destructive paths.
 - Live MIGX mutation parity: PASS, 3/3 actions with transactional rollback.
 - Live VirtualPage mutation absence parity: PASS, 10/10 actions match legacy when VirtualPage is not installed; positive lifecycle remains to be verified on a VirtualPage-enabled test site.
