@@ -189,7 +189,7 @@ Current validation status:
 - MODX 3.2.4-pl has passed the complete live regression suite;
 - MODX 3 processor compatibility is checked against 3.2.2-pl, 3.2.4-pl and the current 3.x branch;
 - MODX 2.8.9-pl has passed the dedicated live release-smoke and core live regression suite;
-- both platform artifacts have now completed dedicated live validation; final publication still requires building the release artifacts, checksums and GitHub release.
+- both platform artifacts have completed dedicated live validation, and **v1.1.0 is published as the current stable GitHub release**.
 
 See [build architecture](docs/BUILD-ARCHITECTURE.md) and [validation status](docs/VALIDATION.md) for the exact matrix.
 
@@ -215,7 +215,7 @@ Install only the package that matches the MODX major version. Both packages inst
 
 Existing `modxmcp.*` settings and the API token are preserved during reinstall or upgrade.
 
-Version 1.1.0 remains the source/release-candidate version until the GitHub release is published; the latest published stable GitHub release remains 1.0.1.
+Version **1.1.0** is the current published stable GitHub release.
 
 ## Command-line installation
 
@@ -243,7 +243,7 @@ The installer creates the required settings and manager entries and generates an
 
 ## Configure an MCP client
 
-For version 1.1.0, pin the release tag after it is published:
+For version 1.1.0, pin the published release tag:
 
 ```json
 {
@@ -298,11 +298,11 @@ The original work and attribution are preserved in the project history and licen
 
 The project is distributed under the **MIT License**. See [LICENSE](LICENSE).
 
-Current source/release-candidate version: **1.1.0**.
+Current stable version: **1.1.0**.
 
-Latest published stable release: **[1.0.1](https://github.com/rumata-estor/modx3-mcp/releases/tag/v1.0.1)**. Version 1.1.0 has completed both platform live-validation gates but is not the published stable release until its tag and release artifacts are created.
+Latest published stable release: **[1.1.0](https://github.com/rumata-estor/modx3-mcp/releases/tag/v1.1.0)**.
 
-The 1.1.0 release is designed to include the source archive plus separate MODX 2 and MODX 3 transport packages and their SHA-256 checksums.
+The 1.1.0 release includes GitHub source archives, separate MODX 2 and MODX 3 transport packages, and their SHA-256 checksums.
 
 ---
 

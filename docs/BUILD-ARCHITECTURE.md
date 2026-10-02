@@ -43,4 +43,4 @@ Version 1.1.0 is the first shared-source release line for MODX 2 and MODX 3.
 - MODX 3.2.4-pl: full live regression completed;
 - MODX 3 processor compatibility: checked against 3.2.2-pl, 3.2.4-pl and current 3.x;
 - MODX 2.8.9-pl: dedicated transport release-smoke and core live regression completed;
-- both platform live-validation gates are complete; publication still requires final artifacts/checksums, tag and GitHub release.
+- both platform live-validation gates are complete; the final artifacts/checksums were verified and **v1.1.0 is published**.

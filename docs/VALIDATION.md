@@ -19,7 +19,7 @@ The modular registry now owns the complete public action contract: 74 read-only 
 
 ## 1.1.0 release readiness
 
-Version 1.1.0 is the first shared-source MODX 2 / MODX 3 release line. MODX 2.8.9-pl and MODX 3.2.4-pl have both completed dedicated transport release-smoke cycles and live validation. The remaining publication work is final artifact/checksum inspection, tagging and creating the GitHub 1.1.0 release.
+Version 1.1.0 is the first shared-source MODX 2 / MODX 3 stable release. MODX 2.8.9-pl and MODX 3.2.4-pl both completed dedicated transport release-smoke cycles and live validation; the final artifacts/checksums were verified and GitHub release `v1.1.0` was published.
 
 ## Current modular read-only coverage
 
