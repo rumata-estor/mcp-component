@@ -1,0 +1,245 @@
+<?php
+/**
+ * Platform-neutral HTTP endpoint body.
+ *
+ * The platform wrapper must initialize $modx and set $modxmcpVariant before
+ * including this file. Security semantics are deliberately identical on MODX 2/3.
+ */
+if (!isset($modx) || !is_object($modx)) {
+    http_response_code(500);
+    echo json_encode(array('success' => false, 'error' => 'MODX bootstrap missing'));
+    exit;
+}
+if (!isset($modxmcpVariant) || $modxmcpVariant === '') {
+    $modxmcpVariant = 'unknown';
+}
+if (!class_exists('ModxMCPClientException')) {
+    class ModxMCPClientException extends Exception {}
+}
+$modxmcpClass = get_class($modx);
+$modxmcpLogConstant = $modxmcpClass . '::LOG_LEVEL_ERROR';
+$modxmcpLogLevelError = defined($modxmcpLogConstant) ? constant($modxmcpLogConstant) : 3;
+$modx->setLogLevel($modxmcpLogLevelError);
+
+header('Content-Type: application/json; charset=utf-8');
+
+// HTTPS enforcement applies to the entire endpoint, including the unauthenticated health GET.
+// X-Forwarded-Proto is NOT trusted unless modxmcp.trust_proxy_https is explicitly enabled;
+// otherwise a direct client could spoof that header.
+if ((bool) $modx->getOption('modxmcp.require_https', null, true)) {
+    $directHttps = (!empty($_SERVER['HTTPS']) && strtolower($_SERVER['HTTPS']) !== 'off')
+        || (isset($_SERVER['SERVER_PORT']) && (int) $_SERVER['SERVER_PORT'] === 443);
+    $trustProxyHttps = (bool) $modx->getOption('modxmcp.trust_proxy_https', null, false);
+    $forwardedHttps = $trustProxyHttps
+        && isset($_SERVER['HTTP_X_FORWARDED_PROTO'])
+        && strtolower(trim((string) $_SERVER['HTTP_X_FORWARDED_PROTO'])) === 'https';
+    $isHttps = $directHttps || $forwardedHttps;
+    if (!$isHttps) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'error' => 'HTTPS required (modxmcp.require_https).'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+}
+
+// Lightweight unauthenticated health/version probe (GET) for client/server skew detection.
+// Returns only non-sensitive info: component name, server build version, enabled flag.
+if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+    $version = 'unknown';
+    $corePath = $modx->getOption('modxmcp.core_path', null, $modx->getOption('core_path') . 'components/modxmcp/');
+    $corePath = str_replace(
+        array('{core_path}', '[[++core_path]]'),
+        rtrim((string) $modx->getOption('core_path'), '/\\') . DIRECTORY_SEPARATOR,
+        (string) $corePath
+    );
+    $modelFile = $corePath . 'model/modxmcp.class.php';
+    if (file_exists($modelFile)) {
+        require_once $modelFile;
+        if (defined('modxMCP::VERSION')) { $version = modxMCP::VERSION; }
+    }
+    echo json_encode([
+        'component' => 'modxMCP',
+        'version'   => $version,
+        'variant'   => (defined('modxMCP::VARIANT') ? modxMCP::VARIANT : $modxmcpVariant),
+        'enabled'   => (bool) $modx->getOption('modxmcp.enabled', null, false),
+    ], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    http_response_code(405);
+    header('Allow: GET, POST');
+    echo json_encode(['success' => false, 'error' => 'Method Not Allowed'], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+$isEnabled = $modx->getOption('modxmcp.enabled', null, false);
+if (!$isEnabled) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'error' => 'modxMCP is disabled.'], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+// Optional client-IP allowlist (modxmcp.allowed_ips). Empty = allow all. CSV of exact
+// IPs and/or IPv4 CIDR ranges (e.g. "203.0.113.4, 10.0.0.0/8"). Matched against REMOTE_ADDR
+// (the real socket peer) — X-Forwarded-For is intentionally NOT trusted (spoofable).
+$allowedIps = trim((string) $modx->getOption('modxmcp.allowed_ips', null, ''));
+if ($allowedIps !== '') {
+    $clientIp = isset($_SERVER['REMOTE_ADDR']) ? (string) $_SERVER['REMOTE_ADDR'] : '';
+    $ipAllowed = false;
+    foreach (explode(',', $allowedIps) as $rule) {
+        $rule = trim($rule);
+        if ($rule === '') { continue; }
+        if (strpos($rule, '/') === false) {
+            if ($clientIp !== '' && $clientIp === $rule) { $ipAllowed = true; break; }
+            continue;
+        }
+        list($subnet, $bits) = array_pad(explode('/', $rule, 2), 2, '');
+        $bits = (int) $bits;
+        $ipLong = ip2long($clientIp);
+        $subLong = ip2long($subnet);
+        if ($ipLong === false || $subLong === false || $bits < 0 || $bits > 32) { continue; }
+        $mask = ($bits === 0) ? 0 : (~0 << (32 - $bits));
+        if (($ipLong & $mask) === ($subLong & $mask)) { $ipAllowed = true; break; }
+    }
+    if (!$ipAllowed) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'error' => 'Forbidden: client IP is not allowed (modxmcp.allowed_ips).'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+}
+
+$expectedToken = $modx->getOption('modxmcp.api_token', null, '');
+$headers =[];
+if (function_exists('getallheaders')) {
+    $headers = array_change_key_case(getallheaders(), CASE_LOWER);
+}
+
+$receivedToken = '';
+if (isset($headers['x-mcp-token'])) $receivedToken = trim($headers['x-mcp-token']);
+elseif (isset($_SERVER['HTTP_X_MCP_TOKEN'])) $receivedToken = trim($_SERVER['HTTP_X_MCP_TOKEN']);
+
+if (empty($expectedToken) || !hash_equals($expectedToken, $receivedToken)) {
+    http_response_code(401);
+    echo json_encode(['success' => false, 'error' => 'Unauthorized'], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+$maxPayloadBytes = (int)$modx->getOption('modxmcp.max_payload_bytes', null, 1024 * 1024);
+$contentLength = isset($_SERVER['CONTENT_LENGTH']) ? (int)$_SERVER['CONTENT_LENGTH'] : 0;
+if ($maxPayloadBytes > 0 && $contentLength > $maxPayloadBytes) {
+    http_response_code(413);
+    echo json_encode([
+        'success' => false,
+        'error' => 'Payload Too Large',
+    ], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+$rawInput = file_get_contents('php://input');
+if ($rawInput === false) {
+    http_response_code(400);
+    echo json_encode(['success' => false, 'error' => 'Could not read request body'], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+if ($maxPayloadBytes > 0 && strlen($rawInput) > $maxPayloadBytes) {
+    http_response_code(413);
+    echo json_encode([
+        'success' => false,
+        'error' => 'Payload Too Large',
+    ], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+$input = json_decode($rawInput, true);
+
+if (json_last_error() !== JSON_ERROR_NONE) {
+    http_response_code(400);
+    echo json_encode([
+        'success' => false,
+        'error' => 'Invalid JSON encoding. Ensure your payload is strictly UTF-8 encoded.',
+        'json_error' => json_last_error_msg()
+    ], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+if (!$input || !isset($input['action'])) {
+    http_response_code(400);
+    echo json_encode(['success' => false, 'error' => 'Bad Request: Missing action.'], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+$action = $input['action'];
+$type   = isset($input['type']) ? $input['type'] : '';
+$data   = isset($input['data']) ? $input['data'] : [];
+
+if (isset($input['name'])) $data['name'] = $input['name'];
+if (isset($input['content'])) $data['content'] = $input['content'];
+if (isset($input['id'])) $data['id'] = $input['id'];
+
+try {
+    $corePath = $modx->getOption('modxmcp.core_path', null, $modx->getOption('core_path') . 'components/modxmcp/');
+    $corePath = str_replace(
+        array('{core_path}', '[[++core_path]]'),
+        rtrim((string) $modx->getOption('core_path'), '/\\') . DIRECTORY_SEPARATOR,
+        (string) $corePath
+    );
+    require_once $corePath . 'model/modxmcp.class.php';
+
+    $mcp = new modxMCP($modx);
+    $result = $mcp->processRequest($action, $type, $data);
+
+    // 'caps' = capability fingerprint; the client watches it to live-refresh its tool list.
+    $caps = (string) $modx->getOption('modxmcp.disabled_groups', null, '');
+    echo json_encode(['success' => true, 'data' => $result, 'caps' => $caps], JSON_UNESCAPED_UNICODE);
+} catch (ModxMCPClientException $e) {
+    // Expected, actionable error (validation, "not installed", "disabled", "not found").
+    http_response_code(400);
+    $caps = (string) $modx->getOption('modxmcp.disabled_groups', null, '');
+    echo json_encode(['success' => false, 'error' => $e->getMessage(), 'caps' => $caps], JSON_UNESCAPED_UNICODE);
+} catch (Exception $e) {
+    $errorId = uniqid('modxmcp_', true);
+    $modx->log(
+        $modxmcpLogLevelError,
+        sprintf(
+            '[%s] MCP request failed. action=%s type=%s message=%s',
+            $errorId,
+            $action,
+            $type,
+            $e->getMessage()
+        )
+    );
+    http_response_code(500);
+    $debug = (bool)$modx->getOption('modxmcp.debug', null, false);
+    $response = [
+        'success' => false,
+        'error' => 'Internal Server Error',
+        'error_id' => $errorId,
+    ];
+    if ($debug) {
+        $response['details'] = $e->getMessage();
+    }
+    echo json_encode($response, JSON_UNESCAPED_UNICODE);
+} catch (Throwable $e) {
+    $errorId = uniqid('modxmcp_', true);
+    $modx->log(
+        $modxmcpLogLevelError,
+        sprintf(
+            '[%s] MCP request failed. action=%s type=%s throwable=%s',
+            $errorId,
+            $action,
+            $type,
+            $e->getMessage()
+        )
+    );
+    http_response_code(500);
+    $debug = (bool)$modx->getOption('modxmcp.debug', null, false);
+    $response = [
+        'success' => false,
+        'error' => 'Internal Server Error',
+        'error_id' => $errorId,
+    ];
+    if ($debug) {
+        $response['details'] = $e->getMessage();
+    }
+    echo json_encode($response, JSON_UNESCAPED_UNICODE);
+}

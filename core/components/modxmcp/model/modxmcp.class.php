@@ -13,6 +13,7 @@ class modxMCP {
     public $modx;
     public $config =[];
     private $actionSpecsCache = null;
+    private $modularRuntime = null;
     private $allowedElementTypes = ['chunk', 'snippet', 'template', 'resource', 'tv', 'category', 'plugin'];
     private $versionXTypes = [
         'resource' => ['class' => 'vxResource', 'processor' => 'resources', 'label' => 'title', 'content_class' => \MODX\Revolution\modResource::class],
@@ -32,6 +33,19 @@ class modxMCP {
             (string) $corePath
         );
         $this->config = array_merge(['corePath' => $corePath], $config);
+
+        // Staged modular core. Fail-open by design: the proven legacy dispatcher
+        // remains authoritative if the new layer is unavailable for any reason.
+        $autoload = rtrim($corePath, '/\\') . DIRECTORY_SEPARATOR . 'src' . DIRECTORY_SEPARATOR . 'Autoloader.php';
+        if (is_file($autoload)) {
+            try {
+                require_once $autoload;
+                \ModxMcp\Autoloader::register(rtrim($corePath, '/\\') . DIRECTORY_SEPARATOR . 'src');
+                $this->modularRuntime = new \ModxMcp\Core\Runtime($this->modx, $this);
+            } catch (\Throwable $e) {
+                $this->modularRuntime = null;
+            }
+        }
     }
 
     /**
@@ -77,6 +91,19 @@ class modxMCP {
         $this->modx->user = $serviceUser;
 
         $this->assertCapabilityEnabled($action);
+
+        // New registry gets first refusal only for explicitly migrated tools.
+        // Everything else falls through to the legacy dispatcher unchanged.
+        if ($this->modularRuntime !== null) {
+            $tool = $this->modularRuntime->registry()->get($action);
+            if ($tool !== null && $tool->supports($this->modularRuntime->context())) {
+                $toolData = is_array($data) ? $data : array();
+                if (($action === 'list_elements' || $action === 'get_element') && !isset($toolData['type']) && $elementType !== '') {
+                    $toolData['type'] = $elementType;
+                }
+                return $tool->execute($this->modularRuntime->context(), $toolData);
+            }
+        }
 
         // Dispatch is driven by actionRegistry() — the single source of truth that also
         // backs listSupportedActions(), the acl/context/workspace processor maps and the
@@ -3179,6 +3206,10 @@ class modxMCP {
             $out[$group] = array_keys($actions);
         }
         return $out;
+    }
+
+    public function getSupportedActions() {
+        return $this->listSupportedActions();
     }
 
     /**

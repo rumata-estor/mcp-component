@@ -2320,16 +2320,38 @@ async function fetchCapabilities() {
   return null;
 }
 
+async function fetchSupportedActions() {
+  try {
+    const r = await modxApiRequest({ action: "list_actions", data: {} });
+    const groups = r && r.data;
+    if (!groups || typeof groups !== "object" || Array.isArray(groups)) return null;
+    const supported = new Set();
+    for (const actions of Object.values(groups)) {
+      if (!Array.isArray(actions)) continue;
+      for (const action of actions) {
+        if (typeof action === "string" && action) supported.add(action);
+      }
+    }
+    return supported.size ? supported : null;
+  } catch (e) {
+    // Compatibility fallback for a server that does not expose list_actions.
+    return null;
+  }
+}
+
 server.setRequestHandler(ListToolsRequestSchema, async () => {
   // Hide tools whose capability group is disabled on the server (modxmcp.disabled_groups) —
   // disabled groups never reach the model's tool list, which is what saves tokens. The live
   // refresh is driven by noteCaps() (called inside modxApiRequest on every response), so no
   // polling is needed.
-  const caps = await fetchCapabilities();
+  const [caps, supported] = await Promise.all([fetchCapabilities(), fetchSupportedActions()]);
   const disabled = new Set(caps && Array.isArray(caps.disabled_actions) ? caps.disabled_actions : []);
-  const tools = disabled.size
-    ? toolDefinitions.filter((t) => !disabled.has(t.name.replace(/^modx_/, "")))
-    : toolDefinitions;
+  const tools = toolDefinitions.filter((t) => {
+    const action = t.name.replace(/^modx_/, "");
+    if (disabled.has(action)) return false;
+    if (supported && !supported.has(action)) return false;
+    return true;
+  });
   return { tools };
 });
 

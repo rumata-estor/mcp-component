@@ -1,0 +1,17 @@
+<?php
+namespace ModxMcp\Tools;
+
+class ContextAccessListTool implements ToolInterface
+{
+    public function name() { return 'list_context_access'; }
+    public function group() { return 'access'; }
+    public function isMutation() { return false; }
+    public function supports($context) { return $context && $context->modx() && $context->platform(); }
+
+    public function execute($context, array $data)
+    {
+        return AclProcessorSupport::run(
+            $context, 'security/access/usergroup/context/getlist', $data, true
+        );
+    }
+}

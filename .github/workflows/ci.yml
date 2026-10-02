@@ -26,6 +26,20 @@ jobs:
       - name: Client syntax check
         run: node --check client/index.js
 
+      - name: Architecture and staging tests
+        run: |
+          python3 _build/test.architecture.py
+          python3 _build/test.build-architecture.py
+          python3 _build/test.endpoint-architecture.py
+          python3 _build/test.modx2-php-compat.py
+          python3 _build/test.migration-coverage.py
+          python3 _build/test.release-staging.py
+
+      - name: Modular core and platform mapping
+        run: |
+          php _build/test.modular-core.php
+          php _build/test.platform-mapping.php
+
       - name: Release smoke runner shell syntax
         run: bash -n _build/release.smoke.sh
 
