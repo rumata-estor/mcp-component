@@ -1,6 +1,6 @@
 **English** | [Русский](CHANGELOG.ru.md)
 
-# MODX3 MCP — Changelog
+# MODX MCP — Changelog
 
 ## 1.1.0 (2026-10-02)
 

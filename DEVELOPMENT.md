@@ -9,7 +9,7 @@ It is written so that an experienced developer can quickly understand the projec
 For a normal installation, the published release and MCP client configuration are usually enough. Development, server-side changes, security settings, production upgrades, and unusual failures require more technical experience. If, after reading the relevant section, you still cannot clearly explain what will change and how you will verify it, do not experiment on a live site. Use a test environment or involve someone with the right experience.
 
 
-MODX MCP is designed for **MODX Revolution 3.x**. Instructions written for the old MODX 2 line must not be copied here mechanically: MODX 3 changed PHP class names, namespaces, core bootstrap, and the location and resolution of built-in processors.
+MODX MCP 1.1.0 is designed for **MODX Revolution 2.8.x and 3.x** from one shared source tree. The two MODX generations differ in PHP class names, namespaces, core bootstrap, manager internals and processor routing, so platform-specific behavior must go through the platform adapters and release overlays rather than be copied between versions mechanically.
 
 > **The main rule of the project: do not give AI the widest possible access. Give it the correct, limited, and verifiable access to MODX objects.**
 
@@ -35,7 +35,7 @@ assets/components/modxmcp/api.php
 main MODX MCP logic
 core/components/modxmcp/model/modxmcp.class.php
       ⇅
-MODX Revolution 3
+MODX Revolution 2.8.x or 3.x
 ```
 
 The important point is that the AI does not need to edit MODX database tables or arbitrary files directly. It asks for a meaningful operation such as "get this chunk", "find where this TV is used", or "update this resource". The server side then performs that operation through MODX.
@@ -55,7 +55,7 @@ The basic setup is:
 5. Start with read-only operations.
 6. Enable write or dangerous operations only when they are actually needed.
 
-For stable use, prefer a specific release such as `v1.0.1` instead of the current development branch.
+For production use, pin the latest published stable release. While 1.1.0 is being validated on MODX 2, the published stable tag remains `v1.0.1`; after the 1.1.0 release, pin `v1.1.0` rather than `main`.
 
 Example MCP client configuration:
 

@@ -29,11 +29,11 @@ missing_client = sorted((server_actions - internal_server_actions) - client_tool
 
 # The public contract should be exact. Internal actions are explicit above.
 if missing_server or missing_client:
-    print("MODX3 MCP client/server action contract FAILED:")
+    print("MODX MCP client/server action contract FAILED:")
     if missing_server:
         print(" - client tools without server action:", ", ".join(missing_server))
     if missing_client:
         print(" - server actions without client tool:", ", ".join(missing_client))
     sys.exit(1)
 
-print(f"MODX3 MCP client/server action contract passed: {len(server_actions)} actions.")
+print(f"MODX MCP client/server action contract passed: {len(server_actions)} actions.")

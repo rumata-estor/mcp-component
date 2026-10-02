@@ -1,3 +1,5 @@
+**English** | [Русский](BUILD-ARCHITECTURE.ru.md)
+
 # Build architecture
 
 One connector source tree produces two platform-specific release artifacts:

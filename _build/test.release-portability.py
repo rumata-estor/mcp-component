@@ -9,7 +9,8 @@ errors = []
 
 EXPECTED_VERSION = "1.1.0"
 EXPECTED_NODE_NAME = "modx3-mcp"
-EXPECTED_TRANSPORT_NAME = "MODX3MCP"
+EXPECTED_MODX3_TRANSPORT_NAME = "MODX3MCP"
+EXPECTED_MODX2_TRANSPORT_NAME = "MODXMCP"
 
 def fail(msg):
     errors.append(msg)
@@ -39,7 +40,13 @@ for rel in required_files:
 package = json.loads((ROOT / "package.json").read_text())
 lock = json.loads((ROOT / "package-lock.json").read_text())
 build_config = (ROOT / "_build/build.config.php").read_text()
+modx2_build_config = (
+    ROOT / "_build/platform/modx2/overlay/_build/build.config.php"
+).read_text()
 model_text = (ROOT / "core/components/modxmcp/model/modxmcp.class.php").read_text()
+modx2_model_text = (
+    ROOT / "core/components/modxmcp/legacy/modx2/modxmcp.class.php"
+).read_text()
 
 def php_define(name, text):
     m = re.search(rf"define\('{re.escape(name)}',\s*'([^']+)'\)", text)
@@ -50,8 +57,10 @@ def model_version(text):
     return None if not m else m.group(1)
 
 versions = {
-    "build.config.php": php_define("PKG_VERSION", build_config),
-    "model::VERSION": model_version(model_text),
+    "MODX 3 build.config.php": php_define("PKG_VERSION", build_config),
+    "MODX 2 build.config.php": php_define("PKG_VERSION", modx2_build_config),
+    "MODX 3 model::VERSION": model_version(model_text),
+    "MODX 2 model::VERSION": model_version(modx2_model_text),
     "package.json": package.get("version"),
     "package-lock.json": lock.get("version"),
     "package-lock root": lock.get("packages", {}).get("", {}).get("version"),
@@ -60,8 +69,16 @@ for source, version in versions.items():
     if version != EXPECTED_VERSION:
         fail(f"{source}: version={version!r}, expected {EXPECTED_VERSION}")
 
-if php_define("PKG_NAME", build_config) != EXPECTED_TRANSPORT_NAME:
-    fail(f"transport package name must be {EXPECTED_TRANSPORT_NAME}")
+if php_define("PKG_NAME", build_config) != EXPECTED_MODX3_TRANSPORT_NAME:
+    fail(
+        "MODX 3 transport package name must be "
+        + EXPECTED_MODX3_TRANSPORT_NAME
+    )
+if php_define("PKG_NAME", modx2_build_config) != EXPECTED_MODX2_TRANSPORT_NAME:
+    fail(
+        "MODX 2 transport package name must be "
+        + EXPECTED_MODX2_TRANSPORT_NAME
+    )
 if package.get("name") != EXPECTED_NODE_NAME:
     fail(f"package.json name must be {EXPECTED_NODE_NAME}")
 if lock.get("name") != EXPECTED_NODE_NAME or lock.get("packages", {}).get("", {}).get("name") != EXPECTED_NODE_NAME:
@@ -382,9 +399,9 @@ if not tx_match or "catch (Throwable $e)" not in tx_match.group(0):
     fail("model: runWithTransaction must rollback on Throwable, not only Exception")
 
 if errors:
-    print("MODX3 MCP portability check FAILED:")
+    print("MODX MCP portability check FAILED:")
     for e in errors:
         print(" -", e)
     sys.exit(1)
 
-print(f"MODX3 MCP portability check passed: {len(required_files)} required files, {len(transport_keys)} settings, secure defaults aligned.")
+print(f"MODX MCP portability check passed: {len(required_files)} required files, {len(transport_keys)} settings, secure defaults aligned.")

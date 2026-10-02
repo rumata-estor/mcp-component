@@ -1,3 +1,5 @@
+**English** | [Русский](VALIDATION.ru.md)
+
 # Connector validation status
 
 Date: 2026-10-02
