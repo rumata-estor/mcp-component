@@ -83,7 +83,7 @@ $modx->setLogTarget('ECHO');
 $versionData = $modx->getVersionData();
 $fullVersion = isset($versionData['full_version']) ? (string)$versionData['full_version'] : '';
 if ($fullVersion === '' || version_compare($fullVersion, '3.0.0', '<') || version_compare($fullVersion, '4.0.0', '>=')) {
-    fwrite(STDERR, "MODX3 MCP requires MODX Revolution 3.x; detected: " . ($fullVersion !== '' ? $fullVersion : 'unknown') . "\n");
+    fwrite(STDERR, "MODX MCP requires MODX Revolution 3.x; detected: " . ($fullVersion !== '' ? $fullVersion : 'unknown') . "\n");
     exit(3);
 }
 

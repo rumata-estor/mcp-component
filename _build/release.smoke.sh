@@ -45,7 +45,7 @@ on_error() {
 trap on_error ERR
 trap cleanup EXIT
 
-echo "== MODX3 MCP release smoke =="
+echo "== MODX MCP release smoke =="
 "$PHP_BIN" -v | head -n 2
 
 stage="php-lint"

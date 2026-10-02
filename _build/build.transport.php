@@ -7,7 +7,7 @@ use MODX\Revolution\Transport\modTransportPackage;
 use xPDO\Transport\xPDOFileVehicle;
 use xPDO\Transport\xPDOTransport;
 /**
- * MODX3 MCP — CLI-only transport package builder.
+ * MODX MCP — CLI-only transport package builder.
  *
  * Run on a MODX 3.x install. It locates config.core.php by walking up from this
  * file, or use MODX_CONFIG_CORE to point at it explicitly.
@@ -18,7 +18,7 @@ use xPDO\Transport\xPDOTransport;
  */
 if (PHP_SAPI !== 'cli') {
     http_response_code(403);
-    die("MODX3 MCP transport builder is CLI-only.\n");
+    die("MODX MCP transport builder is CLI-only.\n");
 }
 
 set_time_limit(0);
@@ -215,7 +215,7 @@ $modx->log(modX::LOG_LEVEL_INFO, 'Packaged core + assets files and install/unins
 /* ---- package attributes ---- */
 $builder->setPackageAttributes(array(
     'license'   => file_exists($sources['docs'] . 'LICENSE') ? file_get_contents($sources['docs'] . 'LICENSE') : 'MIT',
-    'readme'    => file_exists($sources['docs'] . 'README.md') ? file_get_contents($sources['docs'] . 'README.md') : 'MODX3 MCP — MCP endpoint for MODX Revolution 3.',
+    'readme'    => file_exists($sources['docs'] . 'README.md') ? file_get_contents($sources['docs'] . 'README.md') : 'MODX MCP — MCP endpoint for MODX Revolution 3.',
     'changelog' => file_exists($sources['docs'] . 'CHANGELOG.md') ? file_get_contents($sources['docs'] . 'CHANGELOG.md') : '',
     'requires'  => array(
         'modx' => '>=3.0.0,<4.0.0',
