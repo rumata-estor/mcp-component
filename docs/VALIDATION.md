@@ -101,6 +101,19 @@ Migrated actions:
 - `ms2_get_option`
 - `ms2_get_product_options`
 
+## Current modular mutation coverage
+
+The modular runtime now owns all 108 mutation actions.
+
+<!-- MUTATION_MIGRATION_COVERAGE: 108/108 -->
+
+The first mutation block is the direct MODX-processor layer: Access/ACL, Context,
+Namespace and Lexicon writes. These actions now execute through
+`ProcessorMutationTool` + `MutationProcessorCatalog` instead of the legacy
+dispatcher. The mutation migration is now complete: all 108 mutation actions
+are registered in the modular Runtime, so all 182 server actions have a modular
+implementation.
+
 On 2026-10-02 the current modular registry was re-audited on the live MODX 3.2.4-pl sandbox with `_build/test.live-modular-parity.php`. Each action was executed once through the modular registry and once through the same connector instance with `modularRuntime` disabled; all migrated results matched exactly, including expected error contracts.
 
 Filesystem media-source reads remain disabled on the sandbox by `modxmcp.allow_root_filesystem_read=0`; parity therefore verifies the same security denial on both paths rather than weakening the setting for a test. Capability groups that are disabled in persistent settings are enabled only in the parity process memory, so the live audit does not leave the sandbox with broader permissions.
@@ -117,8 +130,22 @@ Filesystem media-source reads remain disabled on the sandbox by `modxmcp.allow_r
 - MODX3 processor compatibility: PASS, 113 processor files on the live MODX3 sandbox.
 - Release portability: PASS.
 - Release staging: PASS.
-- Migration coverage consistency: PASS, 74/74 read-only actions modular and 0 pending.
+- Migration coverage consistency: PASS, read 74/74; mutations 108/108.
 - Live modular-vs-legacy parity: PASS for all 74 migrated actions.
+- Live mutation processor parity: PASS, 46 transactional checks across 40 modular mutation actions; all writes rolled back.
+- Live system/TV/ops mutation parity: PASS, 8/8 actions.
+- Live Property-set mutation parity: PASS, 5/5 actions with transactional rollback.
+- Live media mutation parity: PASS, 9/9 actions in an isolated temporary media source; all artifacts removed.
+- Live resource/ops mutation parity: PASS, 6/6 safe-live actions; empty_recycle_bin skipped because the sandbox had a pre-existing deleted resource, regenerate_token skipped to preserve the active API token.
+- Live VersionX mutation parity: PASS for the safe confirm=true + missing-version contract; no live content was reverted.
+- Live miniShop2 mutation parity: PASS, 12/12 actions; positive create paths were transactionally rolled back and real orders/products were not modified.
+- Live final mutation parity: PASS, bulk_resources and replace_across both match legacy for dry-run and real writes on temporary test objects.
+- Full live regression: PASS, all 14 live parity suites completed with exit code 0 on the final Runtime.
+- Live Package-management mutation parity: PASS, 5/5 actions; package install/uninstall tested only on non-destructive paths.
+- Live MIGX mutation parity: PASS, 3/3 actions with transactional rollback.
+- Live VirtualPage mutation absence parity: PASS, 10/10 actions match legacy when VirtualPage is not installed; positive lifecycle remains to be verified on a VirtualPage-enabled test site.
+- Live element mutation parity: PASS for create/update/dry-run delete/delete across all 7 element types.
+- Live element file mutation parity: PASS for make_static + DB/static line editing across chunk/snippet/template/plugin, with test files removed afterwards.
 - Element list/get live parity matrix: PASS for all 7 supported element types.
 - Element view live parity matrix: PASS for all 4 supported viewable element types.
 - Filesystem media-source disabled-security contract: PASS through the full parity run.

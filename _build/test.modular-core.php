@@ -197,5 +197,145 @@ foreach (array(
 ) as $name) {
     if (!$runtime->registry()->get($name)) { throw new Exception('Missing registered tool: ' . $name); }
 }
-if (count($runtime->registry()->all()) !== 74) { throw new Exception('Unexpected tool count'); }
+$mutationSpecs = \ModxMcp\Registry\MutationProcessorCatalog::specs();
+if (count($mutationSpecs) !== 40) { throw new Exception('Unexpected processor mutation catalog count'); }
+foreach ($mutationSpecs as $name => $spec) {
+    $tool = $runtime->registry()->get($name);
+    if (!$tool) { throw new Exception('Missing processor mutation tool: ' . $name); }
+    if (!$tool->isMutation()) { throw new Exception('Mutation tool not marked as mutation: ' . $name); }
+    if ($tool->group() !== $spec['group']) { throw new Exception('Mutation tool group mismatch: ' . $name); }
+}
+foreach (array('create_element', 'update_element', 'delete_element', 'make_static', 'edit_element_lines') as $name) {
+    $tool = $runtime->registry()->get($name);
+    if (!$tool || !$tool->isMutation() || $tool->group() !== 'elements') {
+        throw new Exception('Bad element mutation registration: ' . $name);
+    }
+}
+foreach (array(
+    'create_system_setting',
+    'update_system_setting',
+    'delete_system_setting',
+    'update_resource_tvs',
+    'clear_tv_values',
+    'clear_cache',
+    'flush_permissions',
+    'run_processor'
+) as $name) {
+    $tool = $runtime->registry()->get($name);
+    if (!$tool || !$tool->isMutation()) {
+        throw new Exception('Bad mutation registration: ' . $name);
+    }
+}
+foreach (array(
+    'create_property_set',
+    'update_property_set',
+    'delete_property_set',
+    'assign_property_set',
+    'unassign_property_set'
+) as $name) {
+    $tool = $runtime->registry()->get($name);
+    if (!$tool || !$tool->isMutation() || $tool->group() !== 'property_sets') {
+        throw new Exception('Bad property-set mutation registration: ' . $name);
+    }
+}
+foreach (array(
+    'create_media_source',
+    'update_media_source',
+    'delete_media_source',
+    'create_media_file',
+    'update_media_file',
+    'delete_media_file',
+    'rename_media_file',
+    'create_media_folder',
+    'delete_media_folder'
+) as $name) {
+    $tool = $runtime->registry()->get($name);
+    if (!$tool || !$tool->isMutation() || $tool->group() !== 'media') {
+        throw new Exception('Bad media mutation registration: ' . $name);
+    }
+}
+foreach (array(
+    'create_provider',
+    'update_provider',
+    'delete_provider',
+    'install_package',
+    'uninstall_package'
+) as $name) {
+    $tool = $runtime->registry()->get($name);
+    if (!$tool || !$tool->isMutation() || $tool->group() !== 'package_management') {
+        throw new Exception('Bad package-management mutation registration: ' . $name);
+    }
+}
+foreach (array(
+    'migx_create_config',
+    'migx_update_config',
+    'migx_delete_config'
+) as $name) {
+    $tool = $runtime->registry()->get($name);
+    if (!$tool || !$tool->isMutation() || $tool->group() !== 'migx') {
+        throw new Exception('Bad MIGX mutation registration: ' . $name);
+    }
+}
+foreach (array(
+    'virtualpage_create_event',
+    'virtualpage_update_event',
+    'virtualpage_delete_event',
+    'virtualpage_create_handler',
+    'virtualpage_update_handler',
+    'virtualpage_delete_handler',
+    'virtualpage_create_route',
+    'virtualpage_update_route',
+    'virtualpage_delete_route',
+    'virtualpage_clear_cache'
+) as $name) {
+    $tool = $runtime->registry()->get($name);
+    if (!$tool || !$tool->isMutation() || $tool->group() !== 'virtualpage') {
+        throw new Exception('Bad VirtualPage mutation registration: ' . $name);
+    }
+}
+foreach (array(
+    'duplicate_element',
+    'duplicate_resource',
+    'undelete_resource',
+    'empty_recycle_bin',
+    'reorder_resources',
+    'refresh_uris',
+    'remove_locks',
+    'regenerate_token'
+) as $name) {
+    $tool = $runtime->registry()->get($name);
+    if (!$tool || !$tool->isMutation()) {
+        throw new Exception('Bad resource/ops mutation registration: ' . $name);
+    }
+}
+$vxRevert = $runtime->registry()->get('versionx_revert_version');
+if (!$vxRevert || !$vxRevert->isMutation() || $vxRevert->group() !== 'versionx') {
+    throw new Exception('Bad VersionX revert registration');
+}
+foreach (array(
+    'ms2_create_option',
+    'ms2_update_option',
+    'ms2_assign_option_to_category',
+    'ms2_create_link_type',
+    'ms2_update_link_type',
+    'ms2_delete_link_type',
+    'ms2_create_product_link',
+    'ms2_delete_product_link',
+    'ms2_create_category',
+    'ms2_update_category',
+    'ms2_update_order',
+    'ms2_update_product_options'
+) as $name) {
+    $tool = $runtime->registry()->get($name);
+    if (!$tool || !$tool->isMutation() || $tool->group() !== 'minishop2') {
+        throw new Exception('Bad miniShop2 mutation registration: ' . $name);
+    }
+}
+foreach (array('bulk_resources', 'replace_across') as $name) {
+    $tool = $runtime->registry()->get($name);
+    if (!$tool || !$tool->isMutation()) {
+        throw new Exception('Bad final mutation registration: ' . $name);
+    }
+}
+if (count($runtime->registry()->all()) !== 182) { throw new Exception('Unexpected tool count'); }
 echo "MODULAR_CORE_OK\n";
