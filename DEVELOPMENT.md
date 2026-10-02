@@ -55,7 +55,7 @@ The basic setup is:
 5. Start with read-only operations.
 6. Enable write or dangerous operations only when they are actually needed.
 
-For production use, pin the latest published stable release. While 1.1.0 is being validated on MODX 2, the published stable tag remains `v1.0.1`; after the 1.1.0 release, pin `v1.1.0` rather than `main`.
+For production use, pin the latest published stable release. Until 1.1.0 is actually published, the stable tag remains `v1.0.1`; after the 1.1.0 release, pin `v1.1.0` rather than `main`.
 
 Example MCP client configuration:
 
@@ -619,7 +619,7 @@ MODX_CONFIG_CORE=/full/path/to/config.core.php bash _build/release.smoke.sh
 
 MODX 2 uses the same process with `--platform modx2` and the MODX 2 release overlay/smoke runner.
 
-A release is ready only when the required static checks pass and the platform artifact has completed its dedicated live smoke. For 1.1.0, MODX 3.2.4-pl is already fully live-validated; the MODX 2 live smoke is the remaining release gate.
+A release is ready only when the required static checks pass and each platform artifact has completed its dedicated live smoke. For 1.1.0, MODX 2.8.9-pl and MODX 3.2.4-pl have both completed live validation; the remaining work is final artifact/checksum inspection, tagging and publication.
 
 ## 16. Updating the version
 

@@ -98,7 +98,14 @@ class modxMCP {
             $tool = $this->modularRuntime->registry()->get($action);
             if ($tool !== null && $tool->supports($this->modularRuntime->context())) {
                 $toolData = is_array($data) ? $data : array();
-                if (($action === 'list_elements' || $action === 'get_element') && !isset($toolData['type']) && $elementType !== '') {
+                $elementBridgeActions = array(
+                    'list_elements',
+                    'get_element',
+                    'create_element',
+                    'update_element',
+                    'delete_element',
+                );
+                if (in_array($action, $elementBridgeActions, true) && !isset($toolData['type']) && $elementType !== '') {
                     $toolData['type'] = $elementType;
                 }
                 return $tool->execute($this->modularRuntime->context(), $toolData);

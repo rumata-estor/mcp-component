@@ -41,15 +41,36 @@ legacy_dispatch_pos = legacy.find('$this->resolveActionSpec($action)')
 if registry_pos < 0 or legacy_dispatch_pos < 0 or registry_pos > legacy_dispatch_pos:
     errors.append('Modular registry must get first refusal before legacy action dispatch')
 
-# Element tools receive `type` as a separate HTTP/processRequest argument; both
-# platform fallbacks must bridge it into modular tool data.
-for rel in (
+# Element tools receive `type` as a separate HTTP/processRequest argument.
+# In the source tree both platform fallbacks are present. A staged release removes
+# legacy snapshots and places the selected platform fallback at model/modxmcp.class.php.
+element_bridge_files = [
     'core/components/modxmcp/model/modxmcp.class.php',
-    'core/components/modxmcp/legacy/modx2/modxmcp.class.php',
-):
+]
+modx2_legacy_bridge = root / 'core/components/modxmcp/legacy/modx2/modxmcp.class.php'
+if modx2_legacy_bridge.is_file():
+    element_bridge_files.append(
+        'core/components/modxmcp/legacy/modx2/modxmcp.class.php'
+    )
+for rel in element_bridge_files:
     text = (root / rel).read_text(encoding='utf-8')
-    if "$toolData['type'] = $elementType" not in text:
-        errors.append(f'{rel}: modular element type bridge missing')
+    bridge_start = text.find('$elementBridgeActions = array(')
+    bridge_end = text.find(
+        'return $tool->execute($this->modularRuntime->context(), $toolData);',
+        bridge_start,
+    )
+    bridge = text[bridge_start:bridge_end] if bridge_start >= 0 and bridge_end >= 0 else ''
+    for action in (
+        'list_elements',
+        'get_element',
+        'create_element',
+        'update_element',
+        'delete_element',
+    ):
+        if "'" + action + "'" not in bridge:
+            errors.append(f'{rel}: modular element type bridge missing {action}')
+    if "$toolData['type'] = $elementType" not in bridge:
+        errors.append(f'{rel}: modular element type bridge assignment missing')
 
 # Filesystem media-source reads must remain behind the explicit security setting.
 media_support = (src / 'Tools' / 'MediaSourceSupport.php').read_text(encoding='utf-8')

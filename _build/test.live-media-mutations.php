@@ -1,6 +1,4 @@
 <?php
-use MODX\Revolution\modX;
-
 if (PHP_SAPI !== 'cli') { exit(2); }
 error_reporting(E_ALL & ~E_DEPRECATED & ~E_STRICT);
 
@@ -30,10 +28,23 @@ if (empty($_SERVER['DOCUMENT_ROOT'])) {
 }
 
 require_once $config;
-require_once rtrim(MODX_CORE_PATH, '/\\') . '/vendor/autoload.php';
-
-$modx = modX::getInstance();
+if (is_file(rtrim(MODX_CORE_PATH, '/\\') . '/model/modx/modx.class.php')) {
+    require_once rtrim(MODX_CORE_PATH, '/\\') . '/model/modx/modx.class.php';
+    $modx = new modX();
+} else {
+    require_once rtrim(MODX_CORE_PATH, '/\\') . '/vendor/autoload.php';
+    $modx = \MODX\Revolution\modX::getInstance();
+}
 $modx->initialize('mgr');
+
+function live_class($modx, $modx2, $modx3)
+{
+    $version = $modx->getVersionData();
+    return isset($version['version']) && (int)$version['version'] === 2
+        ? $modx2
+        : $modx3;
+}
+
 if (method_exists($modx, 'setOption')) {
     $modx->setOption('modxmcp.disabled_groups', '');
     $modx->setOption('modxmcp.audit_log', false);
@@ -108,7 +119,7 @@ function media_tx($modx, $mcp, $action, array $data, $setup = null)
 
 function media_make_source($modx, $name, $basePath)
 {
-    $class = \MODX\Revolution\Sources\modFileMediaSource::class;
+    $class = live_class($modx, 'sources.modFileMediaSource', 'MODX\Revolution\Sources\modFileMediaSource');
     $source = $modx->newObject($class);
     $source->set('name', $name);
     $source->set('class_key', $class);
@@ -172,7 +183,7 @@ $root = rtrim($modx->getOption('assets_path'), '/\\')
     . DIRECTORY_SEPARATOR . 'cache'
     . DIRECTORY_SEPARATOR . 'modxmcp-media-parity';
 $sourceName = '__modxmcp_media_parity__';
-$sourceClass = \MODX\Revolution\Sources\modMediaSource::class;
+$sourceClass = live_class($modx, 'sources.modMediaSource', 'MODX\Revolution\Sources\modMediaSource');
 
 $cleanup = function () use ($modx, $root, $sourceName, $sourceClass) {
     media_rm_tree($root);

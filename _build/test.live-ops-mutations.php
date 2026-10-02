@@ -1,6 +1,4 @@
 <?php
-use MODX\Revolution\modX;
-
 if (PHP_SAPI !== 'cli') { exit(2); }
 
 $config = getenv('MODX_CONFIG_CORE');
@@ -29,10 +27,23 @@ if (empty($_SERVER['DOCUMENT_ROOT'])) {
 }
 
 require_once $config;
-require_once rtrim(MODX_CORE_PATH, '/\\') . '/vendor/autoload.php';
-
-$modx = modX::getInstance();
+if (is_file(rtrim(MODX_CORE_PATH, '/\\') . '/model/modx/modx.class.php')) {
+    require_once rtrim(MODX_CORE_PATH, '/\\') . '/model/modx/modx.class.php';
+    $modx = new modX();
+} else {
+    require_once rtrim(MODX_CORE_PATH, '/\\') . '/vendor/autoload.php';
+    $modx = \MODX\Revolution\modX::getInstance();
+}
 $modx->initialize('mgr');
+
+function live_class($modx, $modx2, $modx3)
+{
+    $version = $modx->getVersionData();
+    return isset($version['version']) && (int)$version['version'] === 2
+        ? $modx2
+        : $modx3;
+}
+
 if (method_exists($modx, 'setOption')) {
     $modx->setOption('modxmcp.disabled_groups', '');
 } else {
@@ -117,7 +128,7 @@ compare_case(
 );
 
 $setupSetting = function ($modx, $data) use ($key) {
-    $class = \MODX\Revolution\modSystemSetting::class;
+    $class = live_class($modx, 'modSystemSetting', 'MODX\Revolution\modSystemSetting');
     $obj = $modx->newObject($class);
     $obj->fromArray(array(
         'key' => $key,
@@ -178,7 +189,7 @@ compare_case(
     $failures
 );
 
-if ($modx->getObject(\MODX\Revolution\modSystemSetting::class, array('key' => $key))) {
+if ($modx->getObject(live_class($modx, 'modSystemSetting', 'MODX\Revolution\modSystemSetting'), array('key' => $key))) {
     fwrite(STDERR, "Temporary system setting survived rollback\n");
     exit(1);
 }

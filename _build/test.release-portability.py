@@ -40,13 +40,32 @@ for rel in required_files:
 package = json.loads((ROOT / "package.json").read_text())
 lock = json.loads((ROOT / "package-lock.json").read_text())
 build_config = (ROOT / "_build/build.config.php").read_text()
-modx2_build_config = (
-    ROOT / "_build/platform/modx2/overlay/_build/build.config.php"
-).read_text()
 model_text = (ROOT / "core/components/modxmcp/model/modxmcp.class.php").read_text()
+
+# Source trees contain both platform templates/fallbacks. Prepared release trees
+# intentionally remove those source-only files and keep only the selected platform.
+build_platform_file = ROOT / "BUILD_PLATFORM"
+build_platform = (
+    build_platform_file.read_text(encoding="utf-8").strip()
+    if build_platform_file.is_file()
+    else ""
+)
+modx2_build_config_path = (
+    ROOT / "_build/platform/modx2/overlay/_build/build.config.php"
+)
+modx2_model_path = ROOT / "core/components/modxmcp/legacy/modx2/modxmcp.class.php"
+modx2_build_config = (
+    modx2_build_config_path.read_text()
+    if modx2_build_config_path.is_file()
+    else None
+)
 modx2_model_text = (
-    ROOT / "core/components/modxmcp/legacy/modx2/modxmcp.class.php"
-).read_text()
+    modx2_model_path.read_text()
+    if modx2_model_path.is_file()
+    else None
+)
+if build_platform and build_platform not in {"modx2", "modx3"}:
+    fail(f"invalid BUILD_PLATFORM={build_platform!r}")
 
 def php_define(name, text):
     m = re.search(rf"define\('{re.escape(name)}',\s*'([^']+)'\)", text)
@@ -57,28 +76,42 @@ def model_version(text):
     return None if not m else m.group(1)
 
 versions = {
-    "MODX 3 build.config.php": php_define("PKG_VERSION", build_config),
-    "MODX 2 build.config.php": php_define("PKG_VERSION", modx2_build_config),
-    "MODX 3 model::VERSION": model_version(model_text),
-    "MODX 2 model::VERSION": model_version(modx2_model_text),
+    "selected build.config.php": php_define("PKG_VERSION", build_config),
+    "selected model::VERSION": model_version(model_text),
     "package.json": package.get("version"),
     "package-lock.json": lock.get("version"),
     "package-lock root": lock.get("packages", {}).get("", {}).get("version"),
 }
+if modx2_build_config is not None:
+    versions["MODX 2 source build.config.php"] = php_define(
+        "PKG_VERSION", modx2_build_config
+    )
+if modx2_model_text is not None:
+    versions["MODX 2 source model::VERSION"] = model_version(modx2_model_text)
 for source, version in versions.items():
     if version != EXPECTED_VERSION:
         fail(f"{source}: version={version!r}, expected {EXPECTED_VERSION}")
 
-if php_define("PKG_NAME", build_config) != EXPECTED_MODX3_TRANSPORT_NAME:
-    fail(
-        "MODX 3 transport package name must be "
-        + EXPECTED_MODX3_TRANSPORT_NAME
-    )
-if php_define("PKG_NAME", modx2_build_config) != EXPECTED_MODX2_TRANSPORT_NAME:
-    fail(
-        "MODX 2 transport package name must be "
-        + EXPECTED_MODX2_TRANSPORT_NAME
-    )
+selected_pkg_name = php_define("PKG_NAME", build_config)
+if build_platform == "modx2":
+    if selected_pkg_name != EXPECTED_MODX2_TRANSPORT_NAME:
+        fail(
+            "MODX 2 transport package name must be "
+            + EXPECTED_MODX2_TRANSPORT_NAME
+        )
+else:
+    if selected_pkg_name != EXPECTED_MODX3_TRANSPORT_NAME:
+        fail(
+            "MODX 3 transport package name must be "
+            + EXPECTED_MODX3_TRANSPORT_NAME
+        )
+
+if modx2_build_config is not None:
+    if php_define("PKG_NAME", modx2_build_config) != EXPECTED_MODX2_TRANSPORT_NAME:
+        fail(
+            "MODX 2 source transport package name must be "
+            + EXPECTED_MODX2_TRANSPORT_NAME
+        )
 if package.get("name") != EXPECTED_NODE_NAME:
     fail(f"package.json name must be {EXPECTED_NODE_NAME}")
 if lock.get("name") != EXPECTED_NODE_NAME or lock.get("packages", {}).get("", {}).get("name") != EXPECTED_NODE_NAME:

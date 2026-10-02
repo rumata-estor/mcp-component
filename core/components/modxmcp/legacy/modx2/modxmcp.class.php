@@ -69,7 +69,14 @@ class modxMCP {
             $tool = $this->modularRuntime->registry()->get($action);
             if ($tool !== null && $tool->supports($this->modularRuntime->context())) {
                 $toolData = is_array($data) ? $data : array();
-                if (($action === 'list_elements' || $action === 'get_element') && !isset($toolData['type']) && $elementType !== '') {
+                $elementBridgeActions = array(
+                    'list_elements',
+                    'get_element',
+                    'create_element',
+                    'update_element',
+                    'delete_element',
+                );
+                if (in_array($action, $elementBridgeActions, true) && !isset($toolData['type']) && $elementType !== '') {
                     $toolData['type'] = $elementType;
                 }
                 return $tool->execute($this->modularRuntime->context(), $toolData);
@@ -398,7 +405,7 @@ class modxMCP {
                 'update_user'  => array('proc' => 'security/user/update', 'via' => 'acl'),
                 'delete_user'  => array('proc' => 'security/user/delete', 'via' => 'acl'),
                 'list_user_groups'        => array('proc' => 'security/group/getlist', 'list' => true, 'via' => 'acl'),
-                'get_user_group'          => array('proc' => 'security/group/get', 'via' => 'acl'),
+                'get_user_group'          => 'getUserGroup',
                 'create_user_group'       => array('proc' => 'security/group/create', 'via' => 'acl'),
                 'update_user_group'       => array('proc' => 'security/group/update', 'via' => 'acl'),
                 'delete_user_group'       => array('proc' => 'security/group/remove', 'via' => 'acl'),
@@ -2838,6 +2845,18 @@ class modxMCP {
      * Map of Access-Control actions to the core MODX security processor that backs them.
      * 'list' => true means the processor returns a getlist {total,results} payload.
      */
+    private function getUserGroup($data) {
+        $id = isset($data['id']) ? (int) $data['id'] : 0;
+        if ($id <= 0) {
+            throw new ModxMCPClientException('get_user_group: id is required.');
+        }
+        $group = $this->modx->getObject('modUserGroup', $id);
+        if (!$group) {
+            throw new ModxMCPClientException("User group not found: {$id}.");
+        }
+        return $group->toArray();
+    }
+
     private function aclActionMap() {
         return $this->procMapFor('acl');
     }

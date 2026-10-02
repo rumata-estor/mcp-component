@@ -1,6 +1,4 @@
 <?php
-use MODX\Revolution\modX;
-
 if (PHP_SAPI !== 'cli') { exit(2); }
 error_reporting(E_ALL & ~E_DEPRECATED & ~E_STRICT);
 
@@ -30,10 +28,23 @@ if (empty($_SERVER['DOCUMENT_ROOT'])) {
 }
 
 require_once $config;
-require_once rtrim(MODX_CORE_PATH, '/\\') . '/vendor/autoload.php';
-
-$modx = modX::getInstance();
+if (is_file(rtrim(MODX_CORE_PATH, '/\\') . '/model/modx/modx.class.php')) {
+    require_once rtrim(MODX_CORE_PATH, '/\\') . '/model/modx/modx.class.php';
+    $modx = new modX();
+} else {
+    require_once rtrim(MODX_CORE_PATH, '/\\') . '/vendor/autoload.php';
+    $modx = \MODX\Revolution\modX::getInstance();
+}
 $modx->initialize('mgr');
+
+function live_class($modx, $modx2, $modx3)
+{
+    $version = $modx->getVersionData();
+    return isset($version['version']) && (int)$version['version'] === 2
+        ? $modx2
+        : $modx3;
+}
+
 if (method_exists($modx, 'setOption')) {
     $modx->setOption('modxmcp.disabled_groups', '');
     $modx->setOption('modxmcp.audit_log', false);
@@ -109,7 +120,7 @@ function ps_tx($modx, $mcp, $action, array $data, $setup = null)
 
 function ps_setup_property_set($modx, array $data)
 {
-    $ps = $modx->newObject(\MODX\Revolution\modPropertySet::class);
+    $ps = $modx->newObject(live_class($modx, 'modPropertySet', 'MODX\Revolution\modPropertySet'));
     $ps->set('name', '__modxmcp_ps_existing__');
     $ps->set('description', 'before');
     $ps->save();
@@ -119,20 +130,20 @@ function ps_setup_property_set($modx, array $data)
 
 function ps_setup_assignment($modx, array $data, $assigned)
 {
-    $ps = $modx->newObject(\MODX\Revolution\modPropertySet::class);
+    $ps = $modx->newObject(live_class($modx, 'modPropertySet', 'MODX\Revolution\modPropertySet'));
     $ps->set('name', '__modxmcp_ps_assign__');
     $ps->save();
 
-    $snippet = $modx->newObject(\MODX\Revolution\modSnippet::class);
+    $snippet = $modx->newObject(live_class($modx, 'modSnippet', 'MODX\Revolution\modSnippet'));
     $snippet->set('name', '__modxmcp_ps_snippet__');
     $snippet->set('snippet', 'return true;');
     $snippet->save();
 
     if ($assigned) {
-        $link = $modx->newObject(\MODX\Revolution\modElementPropertySet::class);
+        $link = $modx->newObject(live_class($modx, 'modElementPropertySet', 'MODX\Revolution\modElementPropertySet'));
         $link->fromArray(array(
             'element' => (int)$snippet->get('id'),
-            'element_class' => \MODX\Revolution\modSnippet::class,
+            'element_class' => live_class($modx, 'modSnippet', 'MODX\Revolution\modSnippet'),
             'property_set' => (int)$ps->get('id'),
         ), '', true, true);
         $link->save();
@@ -188,7 +199,7 @@ ps_compare(
     $failures
 );
 
-if ($modx->getObject(\MODX\Revolution\modPropertySet::class, array('name:LIKE' => '__modxmcp_ps_%'))) {
+if ($modx->getObject(live_class($modx, 'modPropertySet', 'MODX\Revolution\modPropertySet'), array('name:LIKE' => '__modxmcp_ps_%'))) {
     fwrite(STDERR, "Temporary property set survived rollback\n");
     exit(1);
 }

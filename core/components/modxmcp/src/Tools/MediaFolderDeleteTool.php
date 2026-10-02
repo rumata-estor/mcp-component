@@ -6,7 +6,7 @@ class MediaFolderDeleteTool implements ToolInterface
     public function name() { return 'delete_media_folder'; }
     public function group() { return 'media'; }
     public function isMutation() { return true; }
-    public function supports($context) { return $context && $context->modx(); }
+    public function supports($context) { return $context && $context->modx() && $context->platform(); }
 
     public function execute($context, array $data)
     {
@@ -20,7 +20,15 @@ class MediaFolderDeleteTool implements ToolInterface
                 . '(refusing to remove the source root).'
             );
         }
-        $result = $source->removeContainer($path);
+        $removePath = $path;
+        if ((int)$context->platform()->majorVersion() === 2) {
+            $removePath = FilesystemSupport::joinPath(
+                MediaSourceSupport::rootPath($context, $source),
+                $path
+            );
+        }
+
+        $result = $source->removeContainer($removePath);
         if ($result === false) {
             throw new \ModxMCPClientException(
                 'delete_media_folder failed: '
@@ -32,8 +40,8 @@ class MediaFolderDeleteTool implements ToolInterface
             $context,
             $this->name(),
             'source',
-            array('source' => (int)$source->get('id'), 'path' => $path)
+            array('source' => (int)$source->get('id'), 'path' => $removePath)
         );
-        return array('deleted' => true, 'path' => $path);
+        return array('deleted' => true, 'path' => $removePath);
     }
 }

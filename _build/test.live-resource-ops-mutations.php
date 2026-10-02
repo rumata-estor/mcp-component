@@ -1,6 +1,4 @@
 <?php
-use MODX\Revolution\modX;
-
 if (PHP_SAPI !== 'cli') { exit(2); }
 error_reporting(E_ALL & ~E_DEPRECATED & ~E_STRICT);
 
@@ -31,10 +29,23 @@ if (empty($_SERVER['DOCUMENT_ROOT'])) {
 }
 
 require_once $config;
-require_once rtrim(MODX_CORE_PATH, '/\\') . '/vendor/autoload.php';
-
-$modx = modX::getInstance();
+if (is_file(rtrim(MODX_CORE_PATH, '/\\') . '/model/modx/modx.class.php')) {
+    require_once rtrim(MODX_CORE_PATH, '/\\') . '/model/modx/modx.class.php';
+    $modx = new modX();
+} else {
+    require_once rtrim(MODX_CORE_PATH, '/\\') . '/vendor/autoload.php';
+    $modx = \MODX\Revolution\modX::getInstance();
+}
 $modx->initialize('mgr');
+
+function live_class($modx, $modx2, $modx3)
+{
+    $version = $modx->getVersionData();
+    return isset($version['version']) && (int)$version['version'] === 2
+        ? $modx2
+        : $modx3;
+}
+
 if (method_exists($modx, 'setOption')) {
     $modx->setOption('modxmcp.disabled_groups', '');
     $modx->setOption('modxmcp.audit_log', false);
@@ -117,7 +128,7 @@ function rops_tx($modx, $mcp, $action, array $data, $setup = null)
 
 function rops_resource($modx, $deleted = false)
 {
-    $resource = $modx->newObject(\MODX\Revolution\modResource::class);
+    $resource = $modx->newObject(live_class($modx, 'modResource', 'MODX\Revolution\modResource'));
     $resource->fromArray(array(
         'pagetitle' => '__modxmcp_resource_ops__',
         'alias' => '__modxmcp_resource_ops__',
@@ -135,7 +146,7 @@ function rops_resource($modx, $deleted = false)
 
 function rops_snippet($modx)
 {
-    $snippet = $modx->newObject(\MODX\Revolution\modSnippet::class);
+    $snippet = $modx->newObject(live_class($modx, 'modSnippet', 'MODX\Revolution\modSnippet'));
     $snippet->set('name', '__modxmcp_duplicate_source__');
     $snippet->set('snippet', 'return "parity";');
     if (!$snippet->save()) {

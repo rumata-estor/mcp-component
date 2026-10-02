@@ -19,7 +19,7 @@ The modular registry now owns the complete public action contract: 74 read-only 
 
 ## 1.1.0 release readiness
 
-Version 1.1.0 is the first shared-source MODX 2 / MODX 3 release line. MODX 3.2.4-pl has passed the complete live regression matrix. MODX 2 release staging and static/PHP compatibility checks pass; a dedicated live MODX 2 release-smoke cycle is still required before the GitHub 1.1.0 release is published as final stable.
+Version 1.1.0 is the first shared-source MODX 2 / MODX 3 release line. MODX 2.8.9-pl and MODX 3.2.4-pl have both completed dedicated transport release-smoke cycles and live validation. The remaining publication work is final artifact/checksum inspection, tagging and creating the GitHub 1.1.0 release.
 
 ## Current modular read-only coverage
 
@@ -158,18 +158,21 @@ Filesystem media-source reads remain disabled on the sandbox by `modxmcp.allow_r
 
 ## MODX 3
 
-Live-tested on a dedicated MODX 3.2.4-pl sandbox. The installed modular Runtime
-matches the current source tree for the validated registry.
+Live-tested on a dedicated MODX 3.2.4-pl sandbox. After the MODX 2 compatibility fixes, the full transport release-smoke was repeated and all 14 live parity suites completed with exit code 0. The original 16 `modxmcp.*` settings were restored and compared after the destructive install/reinstall/uninstall cycle.
 
 Status: LIVE-VALIDATED.
 
 ## MODX 2
 
-- release-stage builds successfully;
-- static PHP compatibility test passes;
-- platform mapping test passes, including `modTemplateVarResource` mapping;
-- build overlay is present.
+Live-tested on a clean MODX 2.8.9-pl sandbox.
 
-No dedicated live MODX2 sandbox has been attached yet.
+- transport release-smoke: PASS for build, fresh install, endpoint CRUD, same-package reinstall with settings preserved, clean uninstall, and final installation;
+- modular read parity: PASS for all 74 read-only actions; absent element fixtures are skipped by the read-only matrix and covered separately by element lifecycle tests;
+- processor mutation parity: PASS, 46 checks across 40 processor mutations;
+- element lifecycle parity: PASS for all 7 supported element types;
+- property sets: 5/5; resource/ops: 6/6 safe-live actions; system/TV/ops: 8/8; media: 9/9; package management: 5/5;
+- final bulk/replace suite: 4 checks across 2/2 actions; element DB/static-file suite: all 4 supported file-backed element types;
+- `empty_recycle_bin` and `regenerate_token` remain intentionally skipped live for the same safety reasons as on MODX 3;
+- positive third-party-extra lifecycles are not claimed on this clean MODX 2 sandbox because MIGX, miniShop2, VersionX and VirtualPage are not installed there; their absence/error contracts are covered by the common parity matrix.
 
-Status: STATICALLY VALIDATED, LIVE TEST PENDING.
+Status: LIVE-VALIDATED FOR CORE/RUNTIME AND RELEASE-SMOKE.

@@ -27,8 +27,10 @@ Major architecture release preparing the project as a shared MODX 2 / MODX 3 cod
 - Added platform release staging via `_build/prepare-release.py --platform modx2|modx3`.
 - MODX 3.2.4-pl passed the full live regression matrix, including read parity and domain-specific mutation parity suites.
 - MODX 3 processor compatibility continues to be checked against 3.2.2-pl, 3.2.4-pl and current 3.x.
-- MODX 2 PHP/static compatibility and release staging checks pass.
-- A dedicated live MODX 2 release-smoke is still required before 1.1.0 is published as the final stable GitHub release.
+- MODX 2.8.9-pl passed the dedicated transport release-smoke and core live regression suite: 74 read-only parity actions, 46 processor-mutation checks, all 7 element lifecycles, media 9/9, property sets 5/5, package operations 5/5 and the remaining core mutation suites.
+- MODX 3.2.4-pl was re-validated after the shared MODX 2 fixes; the release-smoke and all 14 live parity suites completed successfully, including MIGX 3/3 and miniShop2 12/12.
+- Fixed modular element-type bridging for create/update/delete requests and the MODX 2 absolute-path requirement of `removeContainer()` in `delete_media_folder`.
+- Release/architecture checks now run correctly from prepared platform trees after source-only `legacy` and `_build/platform` templates have been removed.
 - CI now treats the modular 182-action contract and both platform build variants as release invariants.
 
 ## 1.0.1 (2026-09-29)

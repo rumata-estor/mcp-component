@@ -1,6 +1,4 @@
 <?php
-use MODX\Revolution\modX;
-
 if (PHP_SAPI !== 'cli') { fwrite(STDERR, "CLI only.\n"); exit(2); }
 error_reporting(E_ALL & ~E_DEPRECATED & ~E_STRICT);
 
@@ -33,9 +31,13 @@ if (empty($_SERVER['DOCUMENT_ROOT'])) {
 }
 
 require_once $config;
-require_once rtrim(MODX_CORE_PATH, '/\\') . '/vendor/autoload.php';
-
-$modx = modX::getInstance();
+if (is_file(rtrim(MODX_CORE_PATH, '/\\') . '/model/modx/modx.class.php')) {
+    require_once rtrim(MODX_CORE_PATH, '/\\') . '/model/modx/modx.class.php';
+    $modx = new modX();
+} else {
+    require_once rtrim(MODX_CORE_PATH, '/\\') . '/vendor/autoload.php';
+    $modx = \MODX\Revolution\modX::getInstance();
+}
 $modx->initialize('mgr');
 if (method_exists($modx, 'setOption')) {
     $modx->setOption('modxmcp.disabled_groups', '');
@@ -104,16 +106,41 @@ function element_clean($value)
 
 function element_class($modx, $type)
 {
-    $map = array(
-        'chunk' => \MODX\Revolution\modChunk::class,
-        'snippet' => \MODX\Revolution\modSnippet::class,
-        'template' => \MODX\Revolution\modTemplate::class,
-        'resource' => \MODX\Revolution\modResource::class,
-        'tv' => \MODX\Revolution\modTemplateVar::class,
-        'category' => \MODX\Revolution\modCategory::class,
-        'plugin' => \MODX\Revolution\modPlugin::class,
-    );
+    $version = $modx->getVersionData();
+    $isModx2 = isset($version['version']) && (int)$version['version'] === 2;
+    $map = $isModx2
+        ? array(
+            'chunk' => 'modChunk',
+            'snippet' => 'modSnippet',
+            'template' => 'modTemplate',
+            'resource' => 'modResource',
+            'tv' => 'modTemplateVar',
+            'category' => 'modCategory',
+            'plugin' => 'modPlugin',
+        )
+        : array(
+            'chunk' => 'MODX\Revolution\modChunk',
+            'snippet' => 'MODX\Revolution\modSnippet',
+            'template' => 'MODX\Revolution\modTemplate',
+            'resource' => 'MODX\Revolution\modResource',
+            'tv' => 'MODX\Revolution\modTemplateVar',
+            'category' => 'MODX\Revolution\modCategory',
+            'plugin' => 'MODX\Revolution\modPlugin',
+        );
     return $map[$type];
+}
+
+function element_relation_class($modx, $type)
+{
+    $version = $modx->getVersionData();
+    $isModx2 = isset($version['version']) && (int)$version['version'] === 2;
+    if ($type === 'plugin_event') {
+        return $isModx2 ? 'modPluginEvent' : 'MODX\Revolution\modPluginEvent';
+    }
+    if ($type === 'tv_template') {
+        return $isModx2 ? 'modTemplateVarTemplate' : 'MODX\Revolution\modTemplateVarTemplate';
+    }
+    throw new InvalidArgumentException('Unknown relation type: ' . $type);
 }
 
 function element_name_field($type)
@@ -133,13 +160,13 @@ function element_cleanup($modx, $type, $name)
         $id = (int)$object->get('id');
         if ($type === 'plugin') {
             $modx->removeCollection(
-                \MODX\Revolution\modPluginEvent::class,
+                element_relation_class($modx, 'plugin_event'),
                 array('pluginid' => $id)
             );
         }
         if ($type === 'tv') {
             $modx->removeCollection(
-                \MODX\Revolution\modTemplateVarTemplate::class,
+                element_relation_class($modx, 'tv_template'),
                 array('tmplvarid' => $id)
             );
         }

@@ -1,6 +1,4 @@
 <?php
-use MODX\Revolution\modX;
-
 if (PHP_SAPI !== 'cli') { exit(2); }
 error_reporting(E_ALL & ~E_DEPRECATED & ~E_STRICT);
 
@@ -30,10 +28,23 @@ if (empty($_SERVER['DOCUMENT_ROOT'])) {
 }
 
 require_once $config;
-require_once rtrim(MODX_CORE_PATH, '/\\') . '/vendor/autoload.php';
-
-$modx = modX::getInstance();
+if (is_file(rtrim(MODX_CORE_PATH, '/\\') . '/model/modx/modx.class.php')) {
+    require_once rtrim(MODX_CORE_PATH, '/\\') . '/model/modx/modx.class.php';
+    $modx = new modX();
+} else {
+    require_once rtrim(MODX_CORE_PATH, '/\\') . '/vendor/autoload.php';
+    $modx = \MODX\Revolution\modX::getInstance();
+}
 $modx->initialize('mgr');
+
+function live_class($modx, $modx2, $modx3)
+{
+    $version = $modx->getVersionData();
+    return isset($version['version']) && (int)$version['version'] === 2
+        ? $modx2
+        : $modx3;
+}
+
 if (method_exists($modx, 'setOption')) {
     $modx->setOption('modxmcp.disabled_groups', '');
     $modx->setOption('modxmcp.audit_log', false);
@@ -109,7 +120,7 @@ function pkg_tx($modx, $mcp, $action, array $data, $setup = null)
 function pkg_setup_provider($modx, array $data)
 {
     $provider = $modx->newObject(
-        \MODX\Revolution\Transport\modTransportProvider::class
+        live_class($modx, 'transport.modTransportProvider', 'MODX\Revolution\Transport\modTransportProvider')
     );
     $provider->set('name', '__modxmcp_provider_existing__');
     $provider->set('service_url', 'https://example.invalid/');
@@ -175,11 +186,11 @@ pkg_compare(
 
 // Safe positive install path: an already-installed package returns before network/download.
 $provider = $modx->getObject(
-    \MODX\Revolution\Transport\modTransportProvider::class,
+    live_class($modx, 'transport.modTransportProvider', 'MODX\Revolution\Transport\modTransportProvider'),
     array('id:>' => 0)
 );
 $installed = $modx->getObject(
-    \MODX\Revolution\Transport\modTransportPackage::class,
+    live_class($modx, 'transport.modTransportPackage', 'MODX\Revolution\Transport\modTransportPackage'),
     array('installed:!=' => null)
 );
 if ($provider && $installed && $installed->get('package_name')) {

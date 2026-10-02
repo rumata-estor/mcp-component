@@ -1,6 +1,4 @@
 <?php
-use MODX\Revolution\modX;
-
 if (PHP_SAPI !== 'cli') { exit(2); }
 error_reporting(E_ALL & ~E_DEPRECATED & ~E_STRICT);
 
@@ -31,10 +29,23 @@ if (empty($_SERVER['DOCUMENT_ROOT'])) {
 }
 
 require_once $config;
-require_once rtrim(MODX_CORE_PATH, '/\\') . '/vendor/autoload.php';
-
-$modx = modX::getInstance();
+if (is_file(rtrim(MODX_CORE_PATH, '/\\') . '/model/modx/modx.class.php')) {
+    require_once rtrim(MODX_CORE_PATH, '/\\') . '/model/modx/modx.class.php';
+    $modx = new modX();
+} else {
+    require_once rtrim(MODX_CORE_PATH, '/\\') . '/vendor/autoload.php';
+    $modx = \MODX\Revolution\modX::getInstance();
+}
 $modx->initialize('mgr');
+
+function live_class($modx, $modx2, $modx3)
+{
+    $version = $modx->getVersionData();
+    return isset($version['version']) && (int)$version['version'] === 2
+        ? $modx2
+        : $modx3;
+}
+
 if (method_exists($modx, 'setOption')) {
     $modx->setOption('modxmcp.disabled_groups', '');
     $modx->setOption('modxmcp.audit_log', false);
@@ -109,13 +120,13 @@ function final_compare($label, $a, $b, &$failures)
 
 function final_remove_resource($modx, $id)
 {
-    $resource = $modx->getObject(\MODX\Revolution\modResource::class, (int)$id);
+    $resource = $modx->getObject(live_class($modx, 'modResource', 'MODX\Revolution\modResource'), (int)$id);
     if ($resource) { $resource->remove(); }
 }
 
 function final_make_resource($modx)
 {
-    $resource = $modx->newObject(\MODX\Revolution\modResource::class);
+    $resource = $modx->newObject(live_class($modx, 'modResource', 'MODX\Revolution\modResource'));
     $resource->fromArray(array(
         'pagetitle' => '__modxmcp_bulk_final__',
         'alias' => '__modxmcp_bulk_final__',
@@ -145,7 +156,7 @@ function final_bulk_run($modx, $mcp, $dryRun)
             )
         );
         if (!$dryRun) {
-            $resource = $modx->getObject(\MODX\Revolution\modResource::class, $id);
+            $resource = $modx->getObject(live_class($modx, 'modResource', 'MODX\Revolution\modResource'), $id);
             $published = $resource ? (int)$resource->get('published') : -1;
             $result['post_published'] = $published;
         }
@@ -159,7 +170,7 @@ function final_bulk_run($modx, $mcp, $dryRun)
 function final_remove_chunk($modx, $name)
 {
     $chunk = $modx->getObject(
-        \MODX\Revolution\modChunk::class,
+        live_class($modx, 'modChunk', 'MODX\Revolution\modChunk'),
         array('name' => $name)
     );
     if ($chunk) { $chunk->remove(); }
@@ -170,7 +181,7 @@ function final_replace_run($modx, $mcp, $dryRun)
     $name = '__modxmcp_replace_final__';
     final_remove_chunk($modx, $name);
 
-    $chunk = $modx->newObject(\MODX\Revolution\modChunk::class);
+    $chunk = $modx->newObject(live_class($modx, 'modChunk', 'MODX\Revolution\modChunk'));
     $chunk->set('name', $name);
     $chunk->set('snippet', "alpha __MODXMCP_FINAL_NEEDLE__ omega\nsecond line");
     $chunk->set('static', 0);
@@ -193,7 +204,7 @@ function final_replace_run($modx, $mcp, $dryRun)
         );
         if (!$dryRun) {
             $chunk = $modx->getObject(
-                \MODX\Revolution\modChunk::class,
+                live_class($modx, 'modChunk', 'MODX\Revolution\modChunk'),
                 array('name' => $name)
             );
             $content = $chunk ? (string)$chunk->get('snippet') : '';

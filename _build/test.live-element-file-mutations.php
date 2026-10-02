@@ -1,6 +1,4 @@
 <?php
-use MODX\Revolution\modX;
-
 if (PHP_SAPI !== 'cli') { fwrite(STDERR, "CLI only.\n"); exit(2); }
 error_reporting(E_ALL & ~E_DEPRECATED & ~E_STRICT);
 
@@ -29,10 +27,23 @@ if (empty($_SERVER['DOCUMENT_ROOT'])) {
     }
 }
 require_once $config;
-require_once rtrim(MODX_CORE_PATH, '/\\') . '/vendor/autoload.php';
-
-$modx = modX::getInstance();
+if (is_file(rtrim(MODX_CORE_PATH, '/\\') . '/model/modx/modx.class.php')) {
+    require_once rtrim(MODX_CORE_PATH, '/\\') . '/model/modx/modx.class.php';
+    $modx = new modX();
+} else {
+    require_once rtrim(MODX_CORE_PATH, '/\\') . '/vendor/autoload.php';
+    $modx = \MODX\Revolution\modX::getInstance();
+}
 $modx->initialize('mgr');
+
+function live_class($modx, $modx2, $modx3)
+{
+    $version = $modx->getVersionData();
+    return isset($version['version']) && (int)$version['version'] === 2
+        ? $modx2
+        : $modx3;
+}
+
 if (method_exists($modx, 'setOption')) {
     $modx->setOption('modxmcp.disabled_groups', '');
     $modx->setOption('modxmcp.auto_static', false);
@@ -71,13 +82,13 @@ function file_call($mcp, $action, array $data)
     }
 }
 
-function file_class($type)
+function file_class($modx, $type)
 {
     $map = array(
-        'chunk' => \MODX\Revolution\modChunk::class,
-        'snippet' => \MODX\Revolution\modSnippet::class,
-        'template' => \MODX\Revolution\modTemplate::class,
-        'plugin' => \MODX\Revolution\modPlugin::class,
+        'chunk' => live_class($modx, 'modChunk', 'MODX\Revolution\modChunk'),
+        'snippet' => live_class($modx, 'modSnippet', 'MODX\Revolution\modSnippet'),
+        'template' => live_class($modx, 'modTemplate', 'MODX\Revolution\modTemplate'),
+        'plugin' => live_class($modx, 'modPlugin', 'MODX\Revolution\modPlugin'),
     );
     return $map[$type];
 }
@@ -102,14 +113,14 @@ function file_abs($modx, $relative)
 
 function file_cleanup($modx, $type, $name)
 {
-    $objects = $modx->getCollection(file_class($type), array(file_name_field($type) => $name));
+    $objects = $modx->getCollection(file_class($modx, $type), array(file_name_field($type) => $name));
     foreach ($objects as $object) {
         $relative = (string)$object->get('static_file');
         $absolute = file_abs($modx, $relative);
         if ($absolute && is_file($absolute)) { @unlink($absolute); }
         if ($type === 'plugin') {
             $modx->removeCollection(
-                \MODX\Revolution\modPluginEvent::class,
+                live_class($modx, 'modPluginEvent', 'MODX\Revolution\modPluginEvent'),
                 array('pluginid' => (int)$object->get('id'))
             );
         }
@@ -156,7 +167,7 @@ function file_lifecycle($modx, $mcp, $type, $name)
     $id = isset($create['value']['id']) ? (int)$create['value']['id'] : 0;
     if ($id <= 0) { throw new Exception('create returned no id'); }
 
-    $object = $modx->getObject(file_class($type), $id, false);
+    $object = $modx->getObject(file_class($modx, $type), $id, false);
     if (!$object) { throw new Exception('created object not found'); }
     $field = file_field($type);
     $original = (string)$object->get($field);
@@ -181,7 +192,7 @@ function file_lifecycle($modx, $mcp, $type, $name)
     );
     if (!$editDb['ok']) { throw new Exception('DB edit failed: ' . $editDb['error']); }
 
-    $object = $modx->getObject(file_class($type), $id, false);
+    $object = $modx->getObject(file_class($modx, $type), $id, false);
     $dbContent = (string)$object->get($field);
     if (strpos($dbContent, "MIDDLE") === false) {
         throw new Exception('DB edit was not persisted');
@@ -224,7 +235,7 @@ function file_lifecycle($modx, $mcp, $type, $name)
     if (strpos($fileComparable, "FIRST") !== 0) {
         throw new Exception('static file edit was not persisted; head=' . json_encode(substr($fileContent, 0, 80)));
     }
-    $object = $modx->getObject(file_class($type), $id, false);
+    $object = $modx->getObject(file_class($modx, $type), $id, false);
     $dbComparable = preg_replace('/^<\?php\s*/', '', (string)$object->get($field));
     if (strpos($dbComparable, "FIRST") !== 0) {
         throw new Exception('DB mirror after static edit was not persisted');
