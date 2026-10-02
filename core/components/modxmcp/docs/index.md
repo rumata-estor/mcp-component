@@ -1,4 +1,4 @@
-# MODX3 MCP — built-in help
+# MODX MCP — built-in help
 
 Call `modx_help` with a `topic` for a focused guide. **New to a site? Read `getting_started`
 first** (the recommended workflow), and call `modx_project_overview` to orient in one cheap call.

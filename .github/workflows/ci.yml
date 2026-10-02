@@ -1,3 +1,5 @@
+[Reading 89 lines from start (total: 89 lines, 0 remaining)]
+
 name: CI
 
 on:
@@ -49,26 +51,30 @@ jobs:
       - name: Client/server action contract
         run: python3 _build/test.client-server-actions.py
 
-      - name: Version consistency (build.config.php == package.json == package-lock.json)
+      - name: Version consistency across shared, MODX 2 and MODX 3 metadata
         run: |
-          PKG=$(php -r "include '_build/build.config.php'; echo PKG_VERSION;")
+          MODX3_PKG=$(php -r "include '_build/build.config.php'; echo PKG_VERSION;")
+          MODX2_PKG=$(php -r "include '_build/platform/modx2/overlay/_build/build.config.php'; echo PKG_VERSION;")
           NPM=$(node -p "require('./package.json').version")
           LOCK=$(node -p "require('./package-lock.json').version")
-          MODEL=$(php -r "require 'core/components/modxmcp/model/modxmcp.class.php'; echo modxMCP::VERSION;")
-          echo "build.config.php=$PKG  package.json=$NPM  package-lock.json=$LOCK  model::VERSION=$MODEL"
-          if [ "$PKG" != "$NPM" ] || [ "$NPM" != "$LOCK" ] || [ "$LOCK" != "$MODEL" ]; then
-            echo "::error::Version mismatch across build.config.php / package.json / package-lock.json / modxMCP::VERSION"
+          MODX3_MODEL=$(php -r "require 'core/components/modxmcp/model/modxmcp.class.php'; echo modxMCP::VERSION;")
+          MODX2_MODEL=$(php -r "require 'core/components/modxmcp/legacy/modx2/modxmcp.class.php'; echo modxMCP::VERSION;")
+          echo "modx3=$MODX3_PKG  modx2=$MODX2_PKG  package.json=$NPM  package-lock.json=$LOCK  modx3-model=$MODX3_MODEL  modx2-model=$MODX2_MODEL"
+          if [ "$MODX3_PKG" != "$NPM" ] || [ "$MODX2_PKG" != "$NPM" ] || [ "$NPM" != "$LOCK" ] || [ "$LOCK" != "$MODX3_MODEL" ] || [ "$MODX3_MODEL" != "$MODX2_MODEL" ]; then
+            echo "::error::Version mismatch across shared / MODX 2 / MODX 3 release metadata"
             exit 1
           fi
 
-      - name: CHANGELOG has an entry for the current version
+      - name: English and Russian CHANGELOGs have the current version
         run: |
           PKG=$(php -r "include '_build/build.config.php'; echo PKG_VERSION;")
-          if ! grep -q "## ${PKG} " CHANGELOG.md; then
-            echo "::error::CHANGELOG.md has no '## ${PKG}' entry"
-            exit 1
-          fi
-          echo "CHANGELOG has an entry for ${PKG}."
+          for FILE in CHANGELOG.md CHANGELOG.ru.md; do
+            if ! grep -q "## ${PKG} " "$FILE"; then
+              echo "::error::$FILE has no '## ${PKG}' entry"
+              exit 1
+            fi
+          done
+          echo "Both CHANGELOG files have an entry for ${PKG}."
 
 
   modx3-processors:

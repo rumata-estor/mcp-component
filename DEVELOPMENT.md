@@ -1,21 +1,21 @@
 **English** | [Русский](DEVELOPMENT.ru.md)
 
-# MODX3 MCP — development and maintenance guide
+# MODX MCP — development and maintenance guide
 
-This document is for people who want to **run, maintain, or extend MODX3 MCP**.
+This document is for people who want to **run, maintain, or extend MODX MCP**.
 
 It is written so that an experienced developer can quickly understand the project architecture, extension points, constraints, and test flow. A less experienced user should still be able to understand the overall structure and see what needs attention, but this guide does not replace practical knowledge of PHP, Node.js, MODX, and server administration.
 
 For a normal installation, the published release and MCP client configuration are usually enough. Development, server-side changes, security settings, production upgrades, and unusual failures require more technical experience. If, after reading the relevant section, you still cannot clearly explain what will change and how you will verify it, do not experiment on a live site. Use a test environment or involve someone with the right experience.
 
 
-MODX3 MCP is designed for **MODX Revolution 3.x**. Instructions written for the old MODX 2 line must not be copied here mechanically: MODX 3 changed PHP class names, namespaces, core bootstrap, and the location and resolution of built-in processors.
+MODX MCP 1.1.0 is designed for **MODX Revolution 2.8.x and 3.x** from one shared source tree. The two MODX generations differ in PHP class names, namespaces, core bootstrap, manager internals and processor routing, so platform-specific behavior must go through the platform adapters and release overlays rather than be copied between versions mechanically.
 
 > **The main rule of the project: do not give AI the widest possible access. Give it the correct, limited, and verifiable access to MODX objects.**
 
 ## 1. How the system works
 
-MODX3 MCP has two main parts.
+MODX MCP has two main parts.
 
 The first part is installed **on the MODX site**. It is a PHP component that works with resources, templates, chunks, snippets, TVs, settings, extras, and other MODX objects.
 
@@ -32,10 +32,10 @@ client/index.js
 site API
 assets/components/modxmcp/api.php
       ⇅
-main MODX3 MCP logic
+main MODX MCP logic
 core/components/modxmcp/model/modxmcp.class.php
       ⇅
-MODX Revolution 3
+MODX Revolution 2.8.x or 3.x
 ```
 
 The important point is that the AI does not need to edit MODX database tables or arbitrary files directly. It asks for a meaningful operation such as "get this chunk", "find where this TV is used", or "update this resource". The server side then performs that operation through MODX.
@@ -44,18 +44,18 @@ The component also has its own pages in the MODX manager, including settings and
 
 ## 2. What you need for a normal setup
 
-If you only want to use MODX3 MCP, you do not need to understand the whole codebase.
+If you only want to use MODX MCP, you do not need to understand the whole codebase.
 
 The basic setup is:
 
-1. Install the MODX3 MCP transport package on the site.
+1. Install the MODX MCP transport package on the site.
 2. Get the automatically generated API token.
-3. Configure an MCP-enabled application to start the Node.js part of MODX3 MCP.
+3. Configure an MCP-enabled application to start the Node.js part of MODX MCP.
 4. Give it the site API URL and the API token.
 5. Start with read-only operations.
 6. Enable write or dangerous operations only when they are actually needed.
 
-For stable use, prefer a specific release such as `v1.0.1` instead of the current development branch.
+For production use, pin the latest published stable release. While 1.1.0 is being validated on MODX 2, the published stable tag remains `v1.0.1`; after the 1.1.0 release, pin `v1.1.0` rather than `main`.
 
 Example MCP client configuration:
 
@@ -66,7 +66,7 @@ Example MCP client configuration:
       "command": "npx",
       "args": [
         "-y",
-        "github:rumata-estor/modx3-mcp#v1.0.1"
+        "github:rumata-estor/modx3-mcp#v1.1.0"
       ],
       "env": {
         "MODX_MCP_SITE_URL": "https://example.com/assets/components/modxmcp/api.php",
@@ -191,18 +191,21 @@ For example, the tool `modx_example_action` normally maps to the server action `
 
 An automated test checks that the Node.js tools and PHP server actions do not drift apart.
 
-In version 1.0.0, the server registry contains 182 actions.
+Version 1.1.0 keeps a 182-action public server contract, and all 182 actions are registered in the modular Runtime.
 
 ### Project version
 
-The version number must match in four places:
+For 1.1.0 and later, the release version must stay aligned across the shared source and both platform release templates:
 
-- `_build/build.config.php` → `PKG_VERSION`;
+- `_build/build.config.php` → MODX 3 `PKG_VERSION`;
+- `_build/platform/modx2/overlay/_build/build.config.php` → MODX 2 `PKG_VERSION`;
 - `package.json` → `version`;
-- `package-lock.json`;
-- `modxMCP::VERSION`.
+- `package-lock.json` root package version;
+- `core/components/modxmcp/model/modxmcp.class.php` → shared/MODX 3 `modxMCP::VERSION`;
+- `core/components/modxmcp/legacy/modx2/modxmcp.class.php` → MODX 2 fallback `modxMCP::VERSION`;
+- the version substituted by `_build/prepare-release.py`.
 
-If the values do not match, automated checks should fail.
+CI and release-staging checks must fail when these values drift.
 
 ### System settings
 
@@ -212,31 +215,35 @@ The project currently compares all 16 `modxmcp.*` settings, including default va
 
 If you add a setting, add it to both installation methods.
 
-## 5. What is specific to MODX 3
+## 5. Platform architecture: MODX 2 and MODX 3
 
-Moving from MODX 2 to MODX 3 is not just a matter of renaming a few files.
+Version 1.1.0 uses one shared modular Runtime for MODX Revolution 2.8.x and 3.x.
 
-MODX 3 changed:
+The shared Tool classes must not depend directly on one MODX major version. Platform differences are isolated behind `PlatformInterface` and the release/bootstrap boundary:
 
-- full PHP class names;
-- namespaces;
-- core bootstrap;
-- locations of built-in processors;
-- how some processors are resolved and called.
+- `Platform/Modx2Platform.php`;
+- `Platform/Modx3Platform.php`;
+- `_build/platform/modx2/`;
+- `_build/platform/modx3/`.
 
-This means an old MODX 2 processor path cannot simply be copied into MODX3 MCP and assumed to work.
+MODX 2 and MODX 3 differ in class names, bootstrap, manager controllers, processor routing and transport APIs. Do not add ad-hoc version checks to domain tools when a platform mapping can express the difference.
 
-The project contains dedicated logic that maps the internal processor route to the real MODX 3 processor class and runs it through `runProcessor()`.
+Architecture checks:
 
-A separate test checks that all referenced processors actually exist:
+```bash
+python3 _build/test.architecture.py
+python3 _build/test.build-architecture.py
+python3 _build/test.modx2-php-compat.py
+python3 _build/test.release-staging.py
+```
+
+MODX 3 processor compatibility is additionally checked against 3.2.2-pl, 3.2.4-pl and the current 3.x branch:
 
 ```bash
 php _build/test.modx3-processors.php /path/to/modx/core/src/Revolution/Processors
 ```
 
-On GitHub, this is checked against MODX 3.2.2-pl, 3.2.4-pl, and the current 3.x branch.
-
-If you are not sure which class, processor, or field to use, the correct next step is to **read the current MODX or extra source code**, not guess.
+If you are unsure which class, processor or field exists on a target platform, read that MODX version's source instead of guessing.
 
 ## 6. How to add a new capability
 
@@ -314,7 +321,7 @@ A good description should state:
 
 ### Step 4. Mark the operation correctly as read-only or write
 
-MODX3 MCP separates:
+MODX MCP separates:
 
 - read-only operations;
 - operations that change the site.
@@ -449,7 +456,7 @@ MODX_MCP_AUDIT_HOOK
 
 Set this to the path of a local program.
 
-After a successful write operation, MODX3 MCP starts that program and sends operation data as JSON through standard input.
+After a successful write operation, MODX MCP starts that program and sends operation data as JSON through standard input.
 
 The payload may include:
 
@@ -464,62 +471,58 @@ The program is started directly, without a shell.
 
 If no external handler is configured, normal operation is unchanged.
 
-If the handler fails, MODX3 MCP reports a warning but does not pretend that an already completed site change failed or rolled back.
+If the handler fails, MODX MCP reports a warning but does not pretend that an already completed site change failed or rolled back.
 
 ## 11. Installing from source
 
-Normal users should prefer the ready-made transport package from a release.
+Normal users should prefer a platform-specific transport package from a release. Source installation is mainly for development and automation.
 
-Direct installation from source is mainly for development, automation, and servers managed by an agent.
+Create a clean platform tree first.
 
-Run:
-
-```bash
-php _build/install.headless.php
-```
-
-If `config.core.php` cannot be found automatically:
+MODX 3:
 
 ```bash
+python3 _build/prepare-release.py --platform modx3 --output /tmp/modxmcp-modx3
+cd /tmp/modxmcp-modx3
 MODX_CONFIG_CORE=/full/path/to/config.core.php php _build/install.headless.php
 ```
 
-If the MODX configuration depends on `DOCUMENT_ROOT`, set the site root explicitly:
+MODX 2:
 
 ```bash
-MODX_DOCUMENT_ROOT=/full/path/to/site \
-MODX_CONFIG_CORE=/full/path/to/config.core.php \
-php _build/install.headless.php
+python3 _build/prepare-release.py --platform modx2 --output /tmp/modxmcp-modx2
+cd /tmp/modxmcp-modx2
+MODX_CONFIG_CORE=/full/path/to/config.core.php php _build/install.headless.php
 ```
 
-This installer is CLI-only and accepts only MODX Revolution 3.x.
+The source repository itself defaults to the MODX 3 build. The release-preparation step applies the matching API wrapper, fallback model, manager overlay and build/install scripts, then removes source-only platform templates and legacy snapshots.
 
-During installation, new `core/components/modxmcp` and `assets/components/modxmcp` trees are prepared separately first.
+If a configuration depends on `DOCUMENT_ROOT`, set `MODX_DOCUMENT_ROOT` explicitly where supported.
 
-The live directories are replaced only after preparation succeeds.
+## 12. Building the transport packages
 
-If installation does not complete, the previous files can be restored.
+One source version produces two transport packages.
 
-Namespace, menu, system-setting, and token changes are performed inside a database transaction so they can be rolled back together with the file deployment if the installation fails.
+Prepare a staging tree for the target platform, then run its builder on a MODX installation of the same major version.
 
-## 12. Building the transport package
-
-The builder runs only from the command line:
-
-```bash
-MODX_CONFIG_CORE=/full/path/to/config.core.php \
-php _build/build.transport.php
-```
-
-The finished package is written to the MODX directory:
+Expected 1.1.0 artifacts:
 
 ```text
-core/packages/
+MODX 2.8.x: modxmcp-1.1.0-pl.transport.zip
+MODX 3.x:   modx3mcp-1.1.0-pl.transport.zip
 ```
 
-The builder must not be run through the browser.
+Example for MODX 3:
 
-It also refuses to build the same package signature on a MODX installation where that package is already installed. This protects the installed package data from accidental damage.
+```bash
+python3 _build/prepare-release.py --platform modx3 --output /tmp/modxmcp-modx3
+cd /tmp/modxmcp-modx3
+MODX_CONFIG_CORE=/full/path/to/config.core.php php _build/build.transport.php
+```
+
+Use `--platform modx2` and a MODX 2.8.x build installation for the MODX 2 artifact.
+
+Do not build one platform's package on the other MODX major version. The transport requirements intentionally reject that mismatch.
 
 ## 13. Checks after development changes
 
@@ -570,7 +573,7 @@ php -l path/to/file.php
 
 Before a release, all PHP files in the project are checked.
 
-### MODX 3 processor compatibility
+### Platform compatibility checks
 
 If built-in MODX processor routes were changed:
 
@@ -588,78 +591,55 @@ The workflow is defined in:
 
 GitHub Actions checks:
 
-- PHP syntax;
-- Node.js syntax;
-- shell syntax of the release runner;
-- portability and core security rules;
-- client/server action consistency;
-- version consistency;
-- a changelog entry for the current version;
-- built-in processor compatibility with MODX 3.2.2-pl, 3.2.4-pl, and the current 3.x branch.
+- PHP and Node.js syntax;
+- architecture and platform staging;
+- MODX 2 PHP/static compatibility;
+- the complete 182-action client/server contract;
+- modular migration coverage (74/74 reads + 108/108 mutations);
+- release portability and secure defaults;
+- version consistency across shared and platform-specific release metadata;
+- changelog coverage for the current version;
+- MODX 3 processor compatibility with 3.2.2-pl, 3.2.4-pl and current 3.x.
 
-These checks are useful, but they do not replace understanding what changed.
+Static CI does not replace live release-smoke on a real installation of each supported MODX major version.
 
 ## 15. Full release verification
 
-The file:
+Full release smoke changes the installed component state: installation, test operations, reinstall, uninstall and final reinstall. Never run it on production.
 
-```text
-_build/release.smoke.sh
-```
+Prepare the platform tree first, then execute the smoke script on a dedicated test site of the same MODX major version.
 
-runs the full release verification cycle.
-
-It **changes the installed component state**: installs it, performs test operations, reinstalls it, removes it, and installs it again.
-
-Therefore:
-
-> **Never run the full release cycle on a production site. Use a separate MODX 3 test installation.**
-
-Run:
+MODX 3 example:
 
 ```bash
-MODX_CONFIG_CORE=/full/path/to/config.core.php \
-bash _build/release.smoke.sh
+python3 _build/prepare-release.py --platform modx3 --output /tmp/modxmcp-modx3
+cd /tmp/modxmcp-modx3
+MODX_CONFIG_CORE=/full/path/to/config.core.php bash _build/release.smoke.sh
 ```
 
-The script:
+MODX 2 uses the same process with `--platform modx2` and the MODX 2 release overlay/smoke runner.
 
-1. checks PHP syntax;
-2. runs source-level regression checks;
-3. checks the Node.js client;
-4. builds the transport package;
-5. saves current settings from the test installation;
-6. installs the package;
-7. checks the API and basic create/read/update/delete operations;
-8. reinstalls the package and verifies that user settings are preserved;
-9. removes the package completely;
-10. installs it again;
-11. restores the original settings;
-12. performs a final read-only check.
-
-For a preliminary check without the install/uninstall cycle:
-
-```bash
-bash _build/release.smoke.sh --preflight-only
-```
+A release is ready only when the required static checks pass and the platform artifact has completed its dedicated live smoke. For 1.1.0, MODX 3.2.4-pl is already fully live-validated; the MODX 2 live smoke is the remaining release gate.
 
 ## 16. Updating the version
 
-Before a new release, update the version consistently in all sources listed above.
+Before a new release, update the version in every shared and platform-specific location listed in the Project version section.
 
 Then:
 
-1. update the changelog;
-2. run source checks;
-3. run the full release verification on a separate MODX 3 installation;
-4. inspect the resulting transport package;
-5. only then create the Git tag and GitHub release.
+1. update both `CHANGELOG.md` and `CHANGELOG.ru.md`;
+2. update English and Russian public documentation when compatibility or installation changes;
+3. run the complete static/architecture/release-staging suite;
+4. prepare both platform release trees;
+5. run the required live release-smoke on dedicated MODX 2 and MODX 3 test installations;
+6. inspect both resulting transport packages and checksums;
+7. only then create the Git tag and publish the GitHub release.
 
-Do not update only `package.json`. The automated checks are designed to catch that mismatch.
+Do not publish a release from a version bump alone.
 
 ## 17. Maintaining an installed system
 
-If you are not developing the code and only maintain an installed MODX3 MCP setup, focus on a few things.
+If you are not developing the code and only maintain an installed MODX MCP setup, focus on a few things.
 
 ### Local and server parts should use the same version
 
@@ -668,7 +648,7 @@ The Node.js side compares its own version with the site API version and warns if
 On production, use a fixed release:
 
 ```text
-github:rumata-estor/modx3-mcp#v1.0.1
+github:rumata-estor/modx3-mcp#v1.1.0
 ```
 
 instead of a development branch.
@@ -690,7 +670,7 @@ Both installation methods are designed to preserve existing system settings and 
 
 ### If the site is behind a reverse proxy
 
-By default, MODX3 MCP does not trust `X-Forwarded-Proto`.
+By default, MODX MCP does not trust `X-Forwarded-Proto`.
 
 Enable:
 
@@ -720,7 +700,7 @@ Create or activate a suitable user, or set a valid `modxmcp.service_user_id`.
 
 ### `Capability ... is disabled`
 
-The required capability group is disabled in MODX3 MCP settings.
+The required capability group is disabled in MODX MCP settings.
 
 Enable it only if the current task really needs it.
 
@@ -755,9 +735,9 @@ Before any significant change, the following should be clear:
 
 If these questions cannot be answered clearly, the change is not ready.
 
-## 20. What is not part of MODX3 MCP
+## 20. What is not part of MODX MCP
 
-The Telegram bot, external server scripts, and internal `AGENT.md` used in our own agent environment are not required parts of MODX3 MCP.
+The Telegram bot, external server scripts, and internal `AGENT.md` used in our own agent environment are not required parts of MODX MCP.
 
 The project should remain a standalone MCP server and MODX component.
 

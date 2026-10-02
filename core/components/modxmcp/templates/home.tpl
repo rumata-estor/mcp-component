@@ -1,5 +1,5 @@
 <div class="container" style="padding:18px;max-width:840px;">
-    <h2 style="margin-top:0;">MODX3 MCP</h2>
+    <h2 style="margin-top:0;">MODX MCP</h2>
     <p style="color:#666;">{$l.intro}</p>
 
     <table class="modxmcp-status" cellpadding="6" style="border-collapse:collapse;width:100%;margin:14px 0;">

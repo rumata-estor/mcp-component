@@ -11,7 +11,7 @@ use MODX\Revolution\Transport\modTransportPackage;
  *
  * Usage:
  *   MODX_CONFIG_CORE=/path/config.core.php php _build/install.transport.php
- *   MODX_CONFIG_CORE=/path/config.core.php php _build/install.transport.php --signature=modx3mcp-1.0.1-pl
+ *   MODX_CONFIG_CORE=/path/config.core.php php _build/install.transport.php --signature=modx3mcp-1.1.0-pl
  *   MODX_CONFIG_CORE=/path/config.core.php php _build/install.transport.php --action=uninstall
  *   ... --show-token
  *

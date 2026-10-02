@@ -73,7 +73,7 @@ class FakeModx {
     }
 }
 class FakeLegacy {
-    const VERSION = '1.0.1-test';
+    const VERSION = '1.1.0-test';
     public function getCapabilities() { return array('ok' => true, 'source' => 'legacy'); }
     public function getSupportedActions() { return array('ops' => array('list_actions')); }
 }
@@ -92,7 +92,7 @@ $info = $runtime->registry()->get('system_info');
 if (!$info || $info->isMutation() || !$info->supports($runtime->context())) { throw new Exception('SystemInfo tool registration failed'); }
 $result = $info->execute($runtime->context(), array());
 if ($result['modx_version'] !== '3.2.4-pl') { throw new Exception('Bad MODX version'); }
-if ($result['modxmcp_version'] !== '1.0.1-test') { throw new Exception('Bad connector version'); }
+if ($result['modxmcp_version'] !== '1.1.0-test') { throw new Exception('Bad connector version'); }
 if ($result['dbtype'] !== 'mysql') { throw new Exception('Bad DB type'); }
 
 $listContexts = $runtime->registry()->get('list_contexts')->execute($runtime->context(), array());

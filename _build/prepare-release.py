@@ -61,10 +61,24 @@ platform_root = out / '_build/platform'
 if platform_root.exists():
     shutil.rmtree(platform_root)
 
-# Keep internal test connector version aligned with current client while architecture is staged.
+# Keep the staged connector version aligned with the selected platform build.
+# This deliberately derives the version from build.config.php so release staging
+# does not introduce another hard-coded version source.
+build_config = out / '_build/build.config.php'
+build_text = build_config.read_text(encoding='utf-8')
+match = re.search(r"define\('PKG_VERSION',\s*'([^']+)'\)", build_text)
+if not match:
+    raise SystemExit(f'PKG_VERSION not found in {build_config}')
+pkg_version = match.group(1)
+
 model = core / 'model/modxmcp.class.php'
 text = model.read_text(encoding='utf-8')
-text = re.sub(r"const VERSION = '[^']+';", "const VERSION = '1.0.1';", text, count=1)
+text = re.sub(
+    r"const VERSION = '[^']+';",
+    "const VERSION = '" + pkg_version + "';",
+    text,
+    count=1,
+)
 model.write_text(text, encoding='utf-8')
 
 (out / 'BUILD_PLATFORM').write_text(args.platform + '\n', encoding='utf-8')

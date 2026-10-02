@@ -8,7 +8,7 @@ if (!class_exists("ModxMCPClientException")) {
     class ModxMCPClientException extends Exception {}
 }
 class modxMCP {
-    const VERSION = '1.0.1';
+    const VERSION = '1.1.0';
     const VARIANT = 'modx3';
     public $modx;
     public $config =[];

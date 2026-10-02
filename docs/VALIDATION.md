@@ -1,3 +1,5 @@
+**English** | [Русский](VALIDATION.ru.md)
+
 # Connector validation status
 
 Date: 2026-10-02
@@ -13,8 +15,11 @@ One source tree contains a shared modular core plus platform adapters:
 - modular `Tools/`
 - shared endpoint `endpoint/api.common.php`
 
-The modular registry gets first refusal. Actions not yet migrated fall through to
-the legacy dispatcher without changing the MCP contract.
+The modular registry now owns the complete public action contract: 74 read-only actions and 108 mutation actions, 182/182 total. The legacy dispatcher remains only as a compatibility/reference layer; normal requests are handled by the modular runtime.
+
+## 1.1.0 release readiness
+
+Version 1.1.0 is the first shared-source MODX 2 / MODX 3 release line. MODX 3.2.4-pl has passed the complete live regression matrix. MODX 2 release staging and static/PHP compatibility checks pass; a dedicated live MODX 2 release-smoke cycle is still required before the GitHub 1.1.0 release is published as final stable.
 
 ## Current modular read-only coverage
 

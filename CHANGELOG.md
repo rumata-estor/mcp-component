@@ -1,6 +1,35 @@
 **English** | [Русский](CHANGELOG.ru.md)
 
-# MODX3 MCP — Changelog
+# MODX MCP — Changelog
+
+## 1.1.0 (2026-10-02)
+
+Major architecture release preparing the project as a shared MODX 2 / MODX 3 codebase.
+
+### MODX 2 and MODX 3 support
+
+- Added a shared modular Runtime with platform adapters for MODX Revolution 2.8.x and 3.x.
+- One source tree now prepares two platform-specific release artifacts: `modxmcp-1.1.0-pl.transport.zip` for MODX 2.8.x and `modx3mcp-1.1.0-pl.transport.zip` for MODX 3.x.
+- The Node.js MCP client and public MCP action contract are shared across both MODX generations.
+- MODX-version differences are isolated behind platform adapters and release overlays instead of being spread through domain tools.
+- The visible component name is now **MODX MCP**. Existing technical identifiers such as the `modxmcp` namespace, repository URL, and Node package name are retained for backward compatibility.
+
+### Complete modular migration
+
+- All **182/182** server actions now execute through the modular Runtime.
+- Read-only migration is complete: **74/74** actions.
+- Mutation/write migration is complete: **108/108** actions.
+- Domain modules now cover elements/resources, contexts, ACL, property sets, media, packages/providers, MIGX, VirtualPage, VersionX, miniShop2, system settings, TV values, bulk operations and maintenance actions.
+- The legacy dispatcher remains only as a compatibility/reference layer.
+
+### Validation and release engineering
+
+- Added platform release staging via `_build/prepare-release.py --platform modx2|modx3`.
+- MODX 3.2.4-pl passed the full live regression matrix, including read parity and domain-specific mutation parity suites.
+- MODX 3 processor compatibility continues to be checked against 3.2.2-pl, 3.2.4-pl and current 3.x.
+- MODX 2 PHP/static compatibility and release staging checks pass.
+- A dedicated live MODX 2 release-smoke is still required before 1.1.0 is published as the final stable GitHub release.
+- CI now treats the modular 182-action contract and both platform build variants as release invariants.
 
 ## 1.0.1 (2026-09-29)
 
