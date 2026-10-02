@@ -26,7 +26,7 @@ class ElementContentSupport
         if ($id <= 0) {
             throw new \ModxMCPClientException('Element not found (provide id or name).');
         }
-        $element = $context->modx()->getObject($map['class'], $id);
+        $element = $context->modx()->getObject($map['class'], $id, false);
         if (!$element) {
             throw new \ModxMCPClientException($type . ' ' . $id . ' not found.');
         }
@@ -58,5 +58,46 @@ class ElementContentSupport
             }
         }
         return array((string)$element->get($map['field']), $isStatic, $absolute);
+    }
+
+    public static function write(
+        $context,
+        $element,
+        $type,
+        array $map,
+        $isStatic,
+        $absolute,
+        $content
+    ) {
+        if ($isStatic && $absolute !== null) {
+            $directory = dirname($absolute);
+            if (!is_dir($directory) && !@mkdir($directory, 0755, true)) {
+                throw new \ModxMCPClientException(
+                    'cannot create directory ' . $directory
+                );
+            }
+            if (@file_put_contents($absolute, $content) === false) {
+                throw new \ModxMCPClientException(
+                    'cannot write static file ' . $absolute
+                );
+            }
+        }
+
+        $data = $element->toArray();
+        $data[$map['field']] = $content;
+        $data = ElementMutationSupport::filterData($type, $data);
+        $response = $context->platform()->runProcessor(
+            $context->modx(),
+            ElementSupport::processorBase($type) . 'update',
+            $data
+        );
+        if (!$response || $response->isError()) {
+            throw new \ModxMCPClientException(
+                'element save failed: '
+                . ($response
+                    ? ProcessorSupport::error($response)
+                    : 'no response.')
+            );
+        }
     }
 }

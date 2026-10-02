@@ -33,14 +33,37 @@ class VersionXSupport
         return $value;
     }
 
-    public static function load($context)
+    public static function corePath($context)
     {
         $modx = $context->modx();
-        $corePath = $modx->getOption(
+        return $modx->getOption(
             'versionx.core_path',
             null,
             $modx->getOption('core_path') . 'components/versionx/'
         );
+    }
+
+    public static function mutationMeta($context, array $data)
+    {
+        $meta = self::type($data);
+        $map = array(
+            'resource' => array('processor' => 'resources', 'content_class' => 'resource'),
+            'chunk' => array('processor' => 'chunks', 'content_class' => 'chunk'),
+            'snippet' => array('processor' => 'snippets', 'content_class' => 'snippet'),
+            'template' => array('processor' => 'templates', 'content_class' => 'template'),
+            'plugin' => array('processor' => 'plugins', 'content_class' => 'plugin'),
+            'tv' => array('processor' => 'templatevars', 'content_class' => 'tv'),
+        );
+        $type = strtolower((string)$data['type']);
+        $meta['processor'] = $map[$type]['processor'];
+        $meta['content_class'] = $context->platform()->className($map[$type]['content_class']);
+        return $meta;
+    }
+
+    public static function load($context)
+    {
+        $modx = $context->modx();
+        $corePath = self::corePath($context);
         $service = $modx->getService('versionx', 'VersionX', $corePath . 'model/');
         if (!$service) {
             throw new \ModxMCPClientException(

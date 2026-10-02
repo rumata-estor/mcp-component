@@ -197,6 +197,260 @@ class VirtualPageSupport
         return isset($map[(int)$type]) ? $map[(int)$type] : 'unknown';
     }
 
+    public static function corePath($context)
+    {
+        $modx = $context->modx();
+        return $modx->getOption(
+            'virtualpage_core_path',
+            null,
+            $modx->getOption('core_path') . 'components/virtualpage/'
+        );
+    }
+
+    public static function service($context, $required = true)
+    {
+        $corePath = self::corePath($context);
+        $service = $context->modx()->getService(
+            'virtualpage',
+            'virtualpage',
+            $corePath . 'model/virtualpage/'
+        );
+        if (!$service && $required) {
+            throw new \ModxMCPClientException(
+                'Could not load VirtualPage service. Is VirtualPage installed on this MODX site?'
+            );
+        }
+        return $service;
+    }
+
+    public static function preparePayload(array $data, array $allowedFields)
+    {
+        $payload = array();
+        foreach ($allowedFields as $field) {
+            if (!array_key_exists($field, $data)) { continue; }
+            $value = $data[$field];
+            if (in_array(
+                $field,
+                array('id', 'type', 'entry', 'rank', 'active', 'cache'),
+                true
+            )) {
+                $value = (int)$value;
+            }
+            $payload[$field] = $value;
+        }
+        return $payload;
+    }
+
+    public static function prepareRoutePayload($context, array $data, $isUpdate)
+    {
+        $payload = self::preparePayload(
+            $data,
+            array(
+                'route', 'handler', 'event', 'description',
+                'rank', 'active', 'properties',
+            )
+        );
+        if (array_key_exists('method', $data)) {
+            $payload['metod'] = self::normalizeMethod($data['method']);
+        } elseif (array_key_exists('metod', $data)) {
+            $payload['metod'] = self::normalizeMethod($data['metod']);
+        }
+
+        $modx = $context->modx();
+        if (!empty($data['event_name'])) {
+            $event = $modx->getObject(
+                'vpEvent',
+                array('name' => (string)$data['event_name'])
+            );
+            if (!$event) {
+                throw new \ModxMCPClientException(
+                    'VirtualPage event not found: ' . $data['event_name'] . '.'
+                );
+            }
+            $payload['event'] = (int)$event->get('id');
+        }
+        if (!empty($data['handler_name'])) {
+            $handler = $modx->getObject(
+                'vpHandler',
+                array('name' => (string)$data['handler_name'])
+            );
+            if (!$handler) {
+                throw new \ModxMCPClientException(
+                    'VirtualPage handler not found: ' . $data['handler_name'] . '.'
+                );
+            }
+            $payload['handler'] = (int)$handler->get('id');
+        }
+
+        if (array_key_exists('properties', $payload)
+            && is_string($payload['properties'])) {
+            $decoded = json_decode($payload['properties'], true);
+            if ($payload['properties'] !== ''
+                && json_last_error() !== JSON_ERROR_NONE) {
+                throw new \ModxMCPClientException(
+                    'properties must be a JSON object or an object payload.'
+                );
+            }
+            $payload['properties'] = is_array($decoded) ? $decoded : array();
+        }
+        if (array_key_exists('properties', $payload)
+            && !is_array($payload['properties'])) {
+            throw new \ModxMCPClientException('properties must be an object.');
+        }
+
+        if (!empty($payload['route'])) {
+            $payload['route'] = '/' . trim((string)$payload['route'], '/');
+            if (!empty($data['route'])
+                && substr((string)$data['route'], -1) === '/') {
+                $payload['route'] .= '/';
+            }
+        }
+
+        if (!$isUpdate) {
+            foreach (array('route', 'metod', 'handler', 'event') as $field) {
+                if (empty($payload[$field])) {
+                    throw new \ModxMCPClientException(
+                        $field . ' is required for VirtualPage route creation.'
+                    );
+                }
+            }
+            if (!array_key_exists('active', $payload)) {
+                $payload['active'] = 1;
+            }
+        }
+
+        if (!empty($payload['handler'])
+            && !$modx->getObject('vpHandler', (int)$payload['handler'])) {
+            throw new \ModxMCPClientException(
+                'VirtualPage handler not found: ' . $payload['handler'] . '.'
+            );
+        }
+        if (!empty($payload['event'])
+            && !$modx->getObject('vpEvent', (int)$payload['event'])) {
+            throw new \ModxMCPClientException(
+                'VirtualPage event not found: ' . $payload['event'] . '.'
+            );
+        }
+
+        return $payload;
+    }
+
+    public static function normalizeHandlerType($type)
+    {
+        if (is_string($type) && !is_numeric($type)) {
+            $map = array(
+                'resource' => 0,
+                'snippet' => 1,
+                'chunk' => 2,
+                'dynamic_resource' => 3,
+                'dynamic-resource' => 3,
+                'template' => 3,
+            );
+            $key = strtolower(trim($type));
+            if (!array_key_exists($key, $map)) {
+                throw new \ModxMCPClientException(
+                    'VirtualPage handler type must be 0, 1, 2, 3, '
+                    . 'resource, snippet, chunk, or dynamic_resource.'
+                );
+            }
+            return $map[$key];
+        }
+        $type = (int)$type;
+        if (!in_array($type, array(0, 1, 2, 3), true)) {
+            throw new \ModxMCPClientException(
+                'VirtualPage handler type must be one of: 0, 1, 2, 3.'
+            );
+        }
+        return $type;
+    }
+
+    public static function assertHandlerEntry($context, $type, $entry)
+    {
+        $entry = (int)$entry;
+        if ($entry <= 0) { return; }
+        $platform = $context->platform();
+        $map = array(
+            0 => $platform->className('resource'),
+            1 => $platform->className('snippet'),
+            2 => $platform->className('chunk'),
+            3 => $platform->className('template'),
+        );
+        if (!empty($map[$type])
+            && !$context->modx()->getObject($map[$type], $entry)) {
+            throw new \ModxMCPClientException(
+                'VirtualPage handler entry not found for type '
+                . $type . ': ' . $entry . '.'
+            );
+        }
+    }
+
+    public static function assertUniqueRoute(
+        $context,
+        $route,
+        $method,
+        $excludeId = 0
+    ) {
+        $query = $context->modx()->newQuery('vpRoute');
+        $query->where(array('route' => $route, 'metod' => $method));
+        if ((int)$excludeId > 0) {
+            $query->where(array('id:!=' => (int)$excludeId));
+        }
+        if ($context->modx()->getCount('vpRoute', $query) > 0) {
+            throw new \ModxMCPClientException(
+                'VirtualPage route already exists for '
+                . $method . ' ' . $route . '.'
+            );
+        }
+    }
+
+    public static function ensurePluginEvent($context, $eventName)
+    {
+        $service = self::service($context, false);
+        if ($service && method_exists($service, 'doEvent')) {
+            return $service->doEvent('create', $eventName, 'vpEvent', 10);
+        }
+
+        $modx = $context->modx();
+        $pluginClass = $context->platform()->className('plugin');
+        $pluginEventClass = $context->platform()->className('plugin_event');
+
+        $plugin = $modx->getObject(
+            $pluginClass,
+            array('name' => 'vpEvent')
+        );
+        if (!$plugin) { return false; }
+
+        $event = $modx->getObject(
+            $pluginEventClass,
+            array(
+                'pluginid' => $plugin->get('id'),
+                'event' => $eventName,
+            )
+        );
+        if (!$event) {
+            $event = $modx->newObject($pluginEventClass);
+            $event->set('pluginid', $plugin->get('id'));
+            $event->set('event', $eventName);
+        }
+        $event->set('priority', 10);
+        return $event->save();
+    }
+
+    public static function clearCache($context)
+    {
+        self::load($context);
+        $service = self::service($context, false);
+        if ($service && method_exists($service, 'clearCache')) {
+            $service->clearCache(array('cache_key' => 'event/'));
+        }
+        $manager = $context->modx()->getCacheManager();
+        if ($manager) {
+            $manager->clean(array('cache_key' => 'default/virtualpage/'));
+            $manager->refresh();
+        }
+        return array('cleared' => true);
+    }
+
     public static function matchRoutePattern($pattern, $path)
     {
         $regex = preg_quote($pattern, '#');
