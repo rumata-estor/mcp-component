@@ -78,7 +78,10 @@ with tempfile.TemporaryDirectory() as td:
         if platform == 'modx2':
             if "const VARIANT = 'modx2';" not in model:
                 errors.append('modx2: wrong fallback model')
-            if "model/modx/modx.class.php" not in builder:
+            if (
+                "model/modx/modx.class.php" not in builder
+                and "DIRECTORY_SEPARATOR . 'model' . DIRECTORY_SEPARATOR . 'modx'" not in builder
+            ):
                 errors.append('modx2: wrong builder bootstrap')
             if ">=2.8.0,<3.0.0" not in builder:
                 errors.append('modx2: missing transport requirement')

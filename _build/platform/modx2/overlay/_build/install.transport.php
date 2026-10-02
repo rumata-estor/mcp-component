@@ -14,11 +14,34 @@ if (!$config || !is_file($config)) {
     }
 }
 if (!$config || !is_file($config)) { fwrite(STDERR,"config.core.php not found; set MODX_CONFIG_CORE.\n"); exit(2); }
-require_once $config;
-if (!defined('MODX_CORE_PATH') || !is_file(MODX_CORE_PATH . 'model/modx/modx.class.php')) {
-    fwrite(STDERR,"MODX 2 bootstrap failed.\n"); exit(2);
+
+$documentRoot = trim((string)getenv('MODX_DOCUMENT_ROOT'));
+if ($documentRoot !== '') {
+    $documentRoot = rtrim($documentRoot, '/\\');
+    if (!is_file($documentRoot . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'model' . DIRECTORY_SEPARATOR . 'modx' . DIRECTORY_SEPARATOR . 'modx.class.php')) {
+        fwrite(STDERR, "MODX_DOCUMENT_ROOT does not look like a MODX 2 web root: {$documentRoot}\n");
+        exit(2);
+    }
+    $_SERVER['DOCUMENT_ROOT'] = $documentRoot;
+} elseif (PHP_SAPI === 'cli' && empty($_SERVER['DOCUMENT_ROOT'])) {
+    $probe = dirname((string)(realpath($config) ?: $config));
+    for ($i = 0; $i < 12; $i++) {
+        $bootstrap = $probe . DIRECTORY_SEPARATOR . 'core' . DIRECTORY_SEPARATOR . 'model' . DIRECTORY_SEPARATOR . 'modx' . DIRECTORY_SEPARATOR . 'modx.class.php';
+        if (is_file($bootstrap)) {
+            $_SERVER['DOCUMENT_ROOT'] = rtrim($probe, '/\\');
+            break;
+        }
+        $parent = dirname($probe);
+        if ($parent === $probe) break;
+        $probe = $parent;
+    }
 }
-require_once MODX_CORE_PATH . 'model/modx/modx.class.php';
+
+require_once $config;
+if (!defined('MODX_CORE_PATH') || !is_file(rtrim(MODX_CORE_PATH,'/\\') . DIRECTORY_SEPARATOR . 'model' . DIRECTORY_SEPARATOR . 'modx' . DIRECTORY_SEPARATOR . 'modx.class.php')) {
+    fwrite(STDERR,"MODX 2 bootstrap failed. Set MODX_DOCUMENT_ROOT when config.core.php depends on DOCUMENT_ROOT.\n"); exit(2);
+}
+require_once rtrim(MODX_CORE_PATH,'/\\') . DIRECTORY_SEPARATOR . 'model' . DIRECTORY_SEPARATOR . 'modx' . DIRECTORY_SEPARATOR . 'modx.class.php';
 $modx = new modX();
 $modx->initialize('mgr');
 $v = $modx->getVersionData();

@@ -226,7 +226,10 @@ if "if (!$setting->save())" not in token_resolver:
 
 if "service_user_id', null, 0" not in model_text:
     fail("model: service_user_id portable default must remain 0")
-if "['active' => 1, 'sudo' => 1]" not in model_text:
+if (
+    "['active' => 1, 'sudo' => 1]" not in model_text
+    and "array('active' => 1, 'sudo' => 1)" not in model_text
+):
     fail("model: automatic service user selection must require active + sudo")
 if "if (!$user->get('sudo'))" not in model_text:
     fail("model: explicitly configured service user must already be sudo")
@@ -259,18 +262,32 @@ for needle, message in {
         fail(message)
 
 transport_installer = (ROOT / "_build/install.transport.php").read_text()
-for needle, message in {
-    "TRANSPORT_UNINSTALL_VERIFY_OK": "transport verifier: uninstall success marker missing",
-    "getCount(modSystemSetting::class": "transport verifier: leftover settings check missing",
-    "getObject(modMenu::class": "transport verifier: leftover menu check missing",
-    "getObject(modNamespace::class": "transport verifier: leftover namespace check missing",
-    "components' . DIRECTORY_SEPARATOR . 'modxmcp": "transport verifier: leftover component-directory check missing",
-    "$expectedSettings = 16": "transport verifier: exact 16-setting install check missing",
-    "$rootMenu": "transport verifier: root menu install check missing",
-    "$graphMenu": "transport verifier: graph menu install check missing",
-    "$deployedVersion !== PKG_VERSION": "transport verifier: deployed code version check missing",
-    "exit(7)": "transport verifier: leftover artifacts must fail the uninstall test",
-}.items():
+if build_platform == "modx2":
+    transport_requirements = {
+        "MODX2_TRANSPORT_UNINSTALL_OK": "transport verifier: uninstall success marker missing",
+        "getCount('modSystemSetting'": "transport verifier: leftover settings check missing",
+        "getObject('modMenu'": "transport verifier: leftover menu check missing",
+        "getObject('modNamespace'": "transport verifier: leftover namespace check missing",
+        "components/modxmcp": "transport verifier: component file verification missing",
+        "===16": "transport verifier: exact 16-setting install check missing",
+        "modxmcp_graph": "transport verifier: graph menu install check missing",
+        "Model version mismatch": "transport verifier: deployed code version check missing",
+        "exit(7)": "transport verifier: leftover artifacts must fail the uninstall test",
+    }
+else:
+    transport_requirements = {
+        "TRANSPORT_UNINSTALL_VERIFY_OK": "transport verifier: uninstall success marker missing",
+        "getCount(modSystemSetting::class": "transport verifier: leftover settings check missing",
+        "getObject(modMenu::class": "transport verifier: leftover menu check missing",
+        "getObject(modNamespace::class": "transport verifier: leftover namespace check missing",
+        "components' . DIRECTORY_SEPARATOR . 'modxmcp": "transport verifier: leftover component-directory check missing",
+        "$expectedSettings = 16": "transport verifier: exact 16-setting install check missing",
+        "$rootMenu": "transport verifier: root menu install check missing",
+        "$graphMenu": "transport verifier: graph menu install check missing",
+        "$deployedVersion !== PKG_VERSION": "transport verifier: deployed code version check missing",
+        "exit(7)": "transport verifier: leftover artifacts must fail the uninstall test",
+    }
+for needle, message in transport_requirements.items():
     if needle not in transport_installer:
         fail(message)
 
@@ -322,7 +339,6 @@ if "$_GET['key']" in builder or "web build requires" in builder:
     fail("transport builder: API token must never be accepted through a web query string")
 builder_requirements = {
     "registerNamespace(": "transport builder must register namespace",
-    "newObject(modMenu::class)": "transport builder must create manager menus",
     "transport.settings.php": "transport builder must package system settings",
     "resolve.token.php": "transport builder must attach token resolver",
     "resolve.integrations.php": "transport builder must attach integrations resolver",
@@ -337,12 +353,22 @@ builder_requirements = {
     "'readme'": "transport package must include readme attribute",
     "'changelog'": "transport package must include changelog attribute",
     "'requires'": "transport package must declare platform dependencies",
-    "'modx' => '>=3.0.0,<4.0.0'": "transport package must restrict installation to MODX 3.x using xPDO constraint syntax",
     "Package staging directory still exists after cleanup": "transport builder must remove its unpacked staging tree after pack()",
     "deleteTree($stagingPath": "transport builder staging cleanup must use a bounded package path",
-    "modTransportPackage::class": "transport builder must detect an already installed same-signature package",
     "Refusing to build {$desiredSignature}": "transport builder must refuse to clobber an installed package staging tree",
 }
+if build_platform == "modx2":
+    builder_requirements.update({
+        "newObject('modMenu')": "transport builder must create manager menus",
+        "'modx' => '>=2.8.0,<3.0.0'": "transport package must restrict installation to MODX 2.8.x using xPDO constraint syntax",
+        "'transport.modTransportPackage'": "transport builder must detect an already installed same-signature package",
+    })
+else:
+    builder_requirements.update({
+        "newObject(modMenu::class)": "transport builder must create manager menus",
+        "'modx' => '>=3.0.0,<4.0.0'": "transport package must restrict installation to MODX 3.x using xPDO constraint syntax",
+        "modTransportPackage::class": "transport builder must detect an already installed same-signature package",
+    })
 for needle, message in builder_requirements.items():
     if needle not in builder:
         fail(message)
@@ -351,6 +377,16 @@ if "'modxmcp'" not in builder or "'modxmcp_graph'" not in builder:
 
 headless_text = (ROOT / "_build/install.headless.php").read_text()
 
+bootstrap_needle = (
+    "core' . DIRECTORY_SEPARATOR . 'model' . DIRECTORY_SEPARATOR . 'modx'"
+    if build_platform == "modx2"
+    else "core' . DIRECTORY_SEPARATOR . 'vendor'"
+)
+bootstrap_error_needles = (
+    ("MODX 2 bootstrap failed", "MODX bootstrap failed")
+    if build_platform == "modx2"
+    else ("MODX bootstrap failed",)
+)
 for cli_name, cli_text in {
     "build.transport.php": builder,
     "install.transport.php": transport_installer,
@@ -359,14 +395,27 @@ for cli_name, cli_text in {
     for needle, message in {
         "MODX_DOCUMENT_ROOT": "must support explicit MODX_DOCUMENT_ROOT",
         "$_SERVER['DOCUMENT_ROOT']": "must restore DOCUMENT_ROOT for CLI bootstrap",
-        "core' . DIRECTORY_SEPARATOR . 'vendor'": "must infer MODX web root using core/vendor/autoload.php",
-        "MODX bootstrap failed": "must fail closed when MODX autoload cannot be resolved",
+        bootstrap_needle: "must infer the MODX web root using the platform bootstrap",
     }.items():
         if needle not in cli_text:
             fail(f"{cli_name}: {message}")
+    if not any(needle in cli_text for needle in bootstrap_error_needles):
+        fail(f"{cli_name}: must fail closed when MODX bootstrap cannot be resolved")
 
-if "getVersionData()" not in headless_text or "version_compare($fullVersion, '3.0.0', '<')" not in headless_text or "version_compare($fullVersion, '4.0.0', '>=')" not in headless_text:
-    fail("headless installer: explicit MODX 3.x preflight guard missing")
+if build_platform == "modx2":
+    if (
+        "getVersionData()" not in headless_text
+        or "version_compare($fullVersion, '2.8.0', '<')" not in headless_text
+        or "version_compare($fullVersion, '3.0.0', '>=')" not in headless_text
+    ):
+        fail("headless installer: explicit MODX 2.8.x preflight guard missing")
+else:
+    if (
+        "getVersionData()" not in headless_text
+        or "version_compare($fullVersion, '3.0.0', '<')" not in headless_text
+        or "version_compare($fullVersion, '4.0.0', '>=')" not in headless_text
+    ):
+        fail("headless installer: explicit MODX 3.x preflight guard missing")
 for needle, message in {
     "register_shutdown_function": "headless installer: rollback shutdown handler missing",
     ".modxmcp-stage-": "headless installer: staged deployment missing",
@@ -428,7 +477,10 @@ if https_pos < 0 or health_get_pos < 0 or https_pos > health_get_pos:
     fail("api.php: HTTPS enforcement must run before the unauthenticated health GET")
 
 tx_match = re.search(r"private function runWithTransaction\(callable \$callback\).*?\n    \}", model_text, re.S)
-if not tx_match or "catch (Throwable $e)" not in tx_match.group(0):
+if not tx_match or (
+    "catch (Throwable $e)" not in tx_match.group(0)
+    and "catch (\\Throwable $e)" not in tx_match.group(0)
+):
     fail("model: runWithTransaction must rollback on Throwable, not only Exception")
 
 if errors:

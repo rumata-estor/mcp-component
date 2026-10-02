@@ -1526,7 +1526,16 @@ class modxMCP {
         if (!$ids) { throw new ModxMCPClientException('bulk_resources: no targets — pass "ids" or a parent/context/query filter.'); }
         if (count($ids) > $limit) { $ids = array_slice($ids, 0, $limit); }
 
-        if ($op === 'set_template' && empty($data['template'])) { throw new ModxMCPClientException('bulk_resources: set_template requires "template".'); }
+        if ($op === 'set_template') {
+            $templateValid = array_key_exists('template', $data)
+                && $data['template'] !== null
+                && $data['template'] !== ''
+                && filter_var($data['template'], FILTER_VALIDATE_INT) !== false
+                && (int) $data['template'] >= 0;
+            if (!$templateValid) {
+                throw new ModxMCPClientException('bulk_resources: set_template requires "template" as a non-negative integer (0 = no template).');
+            }
+        }
         if ($op === 'move' && !isset($data['parent_to']) && empty($data['context_to'])) { throw new ModxMCPClientException('bulk_resources: move requires "parent_to" and/or "context_to".'); }
 
         $dry = !empty($data['dry_run']);
@@ -2777,11 +2786,27 @@ class modxMCP {
     }
 
     private function regenerateToken() {
-        try {
-            $token = bin2hex(random_bytes(32));
-        } catch (Exception $e) {
-            $token = md5(uniqid('modxmcp', true)) . md5(uniqid('token', true));
+        $bytes = false;
+        if (function_exists('random_bytes')) {
+            try {
+                $bytes = random_bytes(32);
+            } catch (Exception $e) {
+                $bytes = false;
+            } catch (Throwable $e) {
+                $bytes = false;
+            }
         }
+        if ($bytes === false && function_exists('openssl_random_pseudo_bytes')) {
+            $strong = false;
+            $candidate = openssl_random_pseudo_bytes(32, $strong);
+            if ($strong && is_string($candidate) && strlen($candidate) === 32) {
+                $bytes = $candidate;
+            }
+        }
+        if (!is_string($bytes) || strlen($bytes) !== 32) {
+            throw new ModxMCPClientException('Cannot generate a cryptographically secure API token.');
+        }
+        $token = bin2hex($bytes);
         $setting = $this->modx->getObject('modSystemSetting', array('key' => 'modxmcp.api_token'));
         if (!$setting) {
             $setting = $this->modx->newObject('modSystemSetting');
@@ -2949,6 +2974,9 @@ class modxMCP {
             $this->modx->commit();
             return $result;
         } catch (Exception $e) {
+            $this->modx->rollback();
+            throw $e;
+        } catch (Throwable $e) {
             $this->modx->rollback();
             throw $e;
         }

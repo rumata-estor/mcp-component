@@ -31,6 +31,8 @@ Major architecture release preparing the project as a shared MODX 2 / MODX 3 cod
 - MODX 3.2.4-pl was re-validated after the shared MODX 2 fixes; the release-smoke and all 14 live parity suites completed successfully, including MIGX 3/3 and miniShop2 12/12.
 - Fixed modular element-type bridging for create/update/delete requests and the MODX 2 absolute-path requirement of `removeContainer()` in `delete_media_folder`.
 - Release/architecture checks now run correctly from prepared platform trees after source-only `legacy` and `_build/platform` templates have been removed.
+- Hardened the MODX 2 release path to the same security baseline as MODX 3: the transport builder is CLI-only, no API token is accepted through a URL, package files use explicit `0644`/`0755` permissions, stale package staging is removed, same-signature installed packages block rebuilding, and release smoke preserves/restores the original `modxmcp.*` settings.
+- Removed the weak MODX 2 fallback token generator and aligned fallback transaction rollback and `bulk_resources set_template` validation with the shared runtime.
 - CI now treats the modular 182-action contract and both platform build variants as release invariants.
 
 ## 1.0.1 (2026-09-29)
