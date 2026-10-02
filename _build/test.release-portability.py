@@ -7,7 +7,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 errors = []
 
-EXPECTED_VERSION = "1.0.1"
+EXPECTED_VERSION = "1.1.0"
 EXPECTED_NODE_NAME = "modx3-mcp"
 EXPECTED_TRANSPORT_NAME = "MODX3MCP"
 

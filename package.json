@@ -1,7 +1,7 @@
 {
   "name": "modx3-mcp",
-  "version": "1.0.1",
-  "description": "MODX3 MCP: MCP server and MODX Revolution 3.x component for safe AI-assisted management of elements, resources, TVs, settings, media and supported add-ons.",
+  "version": "1.1.0",
+  "description": "MODX MCP: MCP server and component for MODX Revolution 2.8.x and 3.x, with a shared modular runtime and safe AI-assisted site management.",
   "type": "commonjs",
   "repository": {
     "type": "git",

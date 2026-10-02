@@ -1,20 +1,23 @@
 **English** | [Русский](README.ru.md)
 
-# MODX3 MCP
+# MODX MCP
 
-**MODX3 MCP** is an MCP server (**Model Context Protocol**) and a component for **MODX Revolution 3.x**. It lets AI agents work with a website through the structure and API of MODX itself, instead of treating the project as just a database and a set of files.
+**MODX MCP** is an MCP server (**Model Context Protocol**) and component line for **MODX Revolution 2.8.x and 3.x**. It lets AI agents work through MODX objects, processors, permissions and relations instead of treating a site as only a database and a set of files.
 
-> **MODX3 MCP does not try to give AI the widest possible access to a website. It tries to give AI the right access to MODX.**
+> **MODX MCP does not try to give AI the widest possible access to a website. It tries to give AI the right access to MODX.**
 
-The project is based on the original [**modxMCP**](https://github.com/dampilov94/mcp-component), created by [**dampilov94**](https://github.com/dampilov94). MODX3 MCP has been substantially reworked for MODX Revolution 3.x: the MODX API layer was updated, the operation set was expanded, safety mechanisms were strengthened, and tools for structure and dependency analysis were added.
+The project is based on the original [**modxMCP**](https://github.com/dampilov94/mcp-component), created by [**dampilov94**](https://github.com/dampilov94). The current codebase grew out of the MODX 3 port and now uses one shared modular runtime with platform adapters for MODX 2 and MODX 3.
 
-**Version [1.0.1](https://github.com/rumata-estor/modx3-mcp/releases/tag/v1.0.1) · MODX Revolution 3.x · MIT**
+**Source version 1.1.0 · MODX Revolution 2.8.x / 3.x · 182/182 modular actions · MIT**
+
+> The repository name `modx3-mcp`, Node package name, and existing technical identifiers are retained for backward compatibility. The product name shown in documentation and the MODX manager is now **MODX MCP**.
+
 
 ## The idea
 
 Giving an AI agent normal server access means it can edit files, run SQL queries, and execute commands. For MODX, that is not enough. A large part of a MODX site lives in resources, templates, chunks, snippets, TVs, system settings, relations between objects, and data managed by installed extras.
 
-MODX3 MCP gives the agent a dedicated management layer that works with these things as MODX objects. The agent can:
+MODX MCP gives the agent a dedicated management layer that works with these things as MODX objects. The agent can:
 
 - find resources, templates, chunks, snippets, plugins, and TVs;
 - inspect dependencies and where elements are used;
@@ -29,44 +32,44 @@ The main goal is to make AI work with MODX more **predictable, reviewable, and r
 
 ## Who is it for?
 
-MODX3 MCP is mainly useful for:
+MODX MCP is mainly useful for:
 
 - MODX developers and integrators who use AI agents in daily work;
 - agencies and teams that maintain several MODX projects;
 - owners of complex MODX sites who want controlled AI access to the CMS;
 - developers of their own agent systems who need more than generic file, SSH, or database access.
 
-## Why MODX3 MCP is designed this way
+## Why MODX MCP is designed this way
 
-MODX3 MCP was not built as a demo showing that an LLM can be connected to a CMS. It was built as a practical tool for working with real websites.
+MODX MCP was not built as a demo showing that an LLM can be connected to a CMS. It was built as a practical tool for working with real websites.
 
 The main risk with an AI agent is not whether it can change a file or a record. The real question is whether it understands the consequences. On a live MODX site, elements rarely exist in isolation. One shared chunk may be used by dozens of resources and templates, a TV may be part of the logic of several sections, and a system setting may affect an entire component.
 
-That is why MODX3 MCP focuses not only on executing commands, but also on context: dependencies, previews, backups, limits for dangerous operations, and auditing.
+That is why MODX MCP focuses not only on executing commands, but also on context: dependencies, previews, backups, limits for dangerous operations, and auditing.
 
 The goal is not to make the agent all-powerful. The goal is to give it enough context and enough limits so it is less likely to make dangerous decisions blindly.
 
 ## Development environment and agent architecture
 
-MODX3 MCP was developed and tested as part of a real agent-based workflow used for practical website maintenance.
+MODX MCP was developed and tested as part of a real agent-based workflow used for practical website maintenance.
 
 For communication between the AI agent and the messaging layer, we used the open-source project [**cc-connect**](https://github.com/chenhg5/cc-connect), created by [**Glenn (chenhg5)**](https://github.com/chenhg5).
 
 In our own workflow, the external interface is built with a **custom Telegram bot and custom server-side scripts**. These tools are kept in a private repository because they are part of our internal infrastructure and our own know-how.
 
-> **MODX3 MCP is a server and a set of tools for an agent. It is not a ready-made agent and it is not tied to Telegram.**
+> **MODX MCP is a server and a set of tools for an agent. It is not a ready-made agent and it is not tied to Telegram.**
 
-The Node.js part of MODX3 MCP runs as a local MCP server over `stdio`. This means it can be used with any client or agent environment that can start and connect to this type of MCP server: an IDE, a custom agent, an automation system, or a compatible chat interface.
+The Node.js part of MODX MCP runs as a local MCP server over `stdio`. This means it can be used with any client or agent environment that can start and connect to this type of MCP server: an IDE, a custom agent, an automation system, or a compatible chat interface.
 
-You can write your own agent instructions and define your own rules for how the agent should work with MODX3 MCP. The Telegram bot is only one interface used in our own workflow.
+You can write your own agent instructions and define your own rules for how the agent should work with MODX MCP. The Telegram bot is only one interface used in our own workflow.
 
-Another part of our internal setup is **AGENT.md** — our own set of system instructions, restrictions, and working rules for an AI agent. It was developed from more than two years of practical work with websites using AI. Some of these rules directly influenced the architecture of MODX3 MCP: dependency analysis, separation of reads and writes, backups, limits around dangerous actions, and auditing.
+Another part of our internal setup is **AGENT.md** — our own set of system instructions, restrictions, and working rules for an AI agent. It was developed from more than two years of practical work with websites using AI. Some of these rules directly influenced the architecture of MODX MCP: dependency analysis, separation of reads and writes, backups, limits around dangerous actions, and auditing.
 
-The Telegram bot, server-side scripts, and AGENT.md are **not dependencies of MODX3 MCP** and are not required to install or use it.
+The Telegram bot, server-side scripts, and AGENT.md are **not dependencies of MODX MCP** and are not required to install or use it.
 
 ## Common AI mistakes when working with a CMS
 
-| Common problem | What can happen | What MODX3 MCP does |
+| Common problem | What can happen | What MODX MCP does |
 | --- | --- | --- |
 | Changing an element without checking where it is used | A shared chunk, snippet, or TV affects several parts of the site | Lets the agent inspect dependencies and usage |
 | Editing the database directly | MODX logic may be bypassed, relations may break, or cache state may become incorrect | Provides dedicated operations for MODX objects |
@@ -79,7 +82,7 @@ The Telegram bot, server-side scripts, and AGENT.md are **not dependencies of MO
 
 ## How this approach is different
 
-MODX3 MCP does not replace SSH, SQL, or file access. It solves a different problem: it gives AI an interface where MODX objects still keep their meaning.
+MODX MCP does not replace SSH, SQL, or file access. It solves a different problem: it gives AI an interface where MODX objects still keep their meaning.
 
 | Approach | What the agent gets | Main limitation |
 | --- | --- | --- |
@@ -87,9 +90,9 @@ MODX3 MCP does not replace SSH, SQL, or file access. It solves a different probl
 | Direct SQL access | Read and write access to database tables | Bypasses application logic and gives little context about object relations |
 | Generic file MCP | Access to source code and the file system | A large part of MODX structure is not stored in files |
 | Generic database MCP | Access to tables and queries | Tables do not explain MODX object semantics to the agent |
-| MODX3 MCP | Dedicated operations for MODX entities and their relations | The agent is limited to capabilities explicitly implemented and allowed by the server |
+| MODX MCP | Dedicated operations for MODX entities and their relations | The agent is limited to capabilities explicitly implemented and allowed by the server |
 
-MODX3 MCP deliberately does not give AI arbitrary access to the whole server. Instead, it gives the agent a narrower but more meaningful interface: a resource stays a resource, a chunk stays a chunk, a TV stays a TV, and dependencies between them can be inspected before a change is made.
+MODX MCP deliberately does not give AI arbitrary access to the whole server. Instead, it gives the agent a narrower but more meaningful interface: a resource stays a resource, a chunk stays a chunk, a TV stays a TV, and dependencies between them can be inspected before a change is made.
 
 ## Example task
 
@@ -97,11 +100,11 @@ For example, you can ask an agent:
 
 > "Increase the price of products in a specific category by 100. First find where the price is stored, check which objects will be affected, and only then make the changes."
 
-Instead of editing database tables directly, the agent can use MODX3 MCP to inspect the project structure, identify the right entities, review related objects, perform the change through available operations, and record the result.
+Instead of editing database tables directly, the agent can use MODX MCP to inspect the project structure, identify the right entities, review related objects, perform the change through available operations, and record the result.
 
 ## Features
 
-The server side of MODX3 MCP exposes more than 180 operations, which the client presents as specialised MCP tools.
+The server side of MODX MCP exposes more than 180 operations, which the client presents as specialised MCP tools.
 
 It supports:
 
@@ -121,11 +124,11 @@ Individual capability groups can be disabled in the component settings.
 
 ## Dependency analysis
 
-One of the key features of MODX3 MCP is a dependency graph for site elements.
+One of the key features of MODX MCP is a dependency graph for site elements.
 
-[![MODX3 MCP dependency graph](docs/images/dependency-graph.png)](docs/images/dependency-graph.png)
+[![MODX MCP dependency graph](docs/images/dependency-graph.png)](docs/images/dependency-graph.png)
 
-*MODX3 MCP dependency graph in the MODX manager: relations between templates, chunks, snippets, TVs, and plugins, plus detected broken references and unused elements.*
+*MODX MCP dependency graph in the MODX manager: relations between templates, chunks, snippets, TVs, and plugins, plus detected broken references and unused elements.*
 
 The agent can find:
 
@@ -141,7 +144,7 @@ The graph is available through MCP and also as a dedicated screen in the MODX ma
 
 ## Safety mechanisms
 
-MODX3 MCP is designed not only for reading data, but also for real work on live websites. Depending on the operation, it supports:
+MODX MCP is designed not only for reading data, but also for real work on live websites. Depending on the operation, it supports:
 
 - automatic safety backups before changes;
 - previewing changes without applying them;
@@ -156,7 +159,7 @@ MODX3 MCP is designed not only for reading data, but also for real work on live 
 
 ## Limits and trust model
 
-MODX3 MCP does not make AI error-free. An LLM can still misunderstand a task, select the wrong object, or suggest an unwanted change.
+MODX MCP does not make AI error-free. An LLM can still misunderstand a task, select the wrong object, or suggest an unwanted change.
 
 The component reduces technical risk and gives the agent more context, but it does not replace proper backups, access control, or human review of critical changes. Extra care is recommended for bulk operations, access-control changes, system settings, custom PHP code, and operations provided by third-party extras.
 
@@ -168,68 +171,79 @@ For integration with your own audit system, the client supports the `MODX_MCP_AU
 
 After a successful write operation, the client can start a configured local program and send JSON to its standard input. The payload includes the MCP tool name, arguments, result, site identifier, actor information, and paths to automatically created safety backups.
 
-The program is started directly, without a shell. If the audit hook is not configured, normal MODX3 MCP behaviour does not change. If the hook itself fails, an already successful site change is not reported as failed. Read-only operations do not trigger the hook.
+The program is started directly, without a shell. If the audit hook is not configured, normal MODX MCP behaviour does not change. If the hook itself fails, an already successful site change is not reported as failed. Read-only operations do not trigger the hook.
 
 ## Compatibility
 
-MODX3 MCP targets:
+Version 1.1.0 is the first shared-source line for both supported MODX generations:
 
-**MODX Revolution >= 3.0.0 and < 4.0.0**
+- **MODX Revolution 2.8.x** — platform artifact `modx2`;
+- **MODX Revolution 3.x** — platform artifact `modx3`;
+- **Node.js 18 or newer** for the local MCP server.
 
-Most development and practical testing of version 1.0.0 was done on **MODX Revolution 3.2.4-pl**.
+The two MODX generations use the same MCP client, the same public action contract and the same modular runtime. Platform-specific bootstrap, class names and processor routing are isolated behind platform adapters and release overlays.
 
-Processor compatibility and core operations were also checked against:
+Current validation status:
 
-- MODX Revolution 3.2.2-pl;
-- MODX Revolution 3.2.4-pl;
-- the current MODX Revolution 3.x branch.
+- all **182/182** server actions are registered in the modular runtime;
+- MODX 3.2.4-pl has passed the complete live regression suite;
+- MODX 3 processor compatibility is checked against 3.2.2-pl, 3.2.4-pl and the current 3.x branch;
+- MODX 2 release staging and PHP/static compatibility tests pass;
+- a dedicated live MODX 2 release-smoke cycle is still required before 1.1.0 is published as final stable.
 
-Running the local MCP server requires **Node.js 18 or newer**.
+See [build architecture](docs/BUILD-ARCHITECTURE.md) and [validation status](docs/VALIDATION.md) for the exact matrix.
 
 ## Quick start
 
 A minimal working setup is:
 
-1. Install the MODX3 MCP transport package.
+1. Install the MODX MCP transport package.
 2. Get the automatically generated API token.
-3. Configure your MCP client to start MODX3 MCP.
+3. Configure your MCP client to start MODX MCP.
 4. Begin with a safe read-only task, for example: "Show me the project structure and the dependencies of template X."
 
 After that, you can move to more complex workflows and enable only the capability groups you actually need.
 
 ## Install with the MODX transport package
 
-For a normal installation, use the ready-made transport package:
+Version 1.1.0 produces two platform-specific transport packages from the same source tree:
 
-`modx3mcp-1.0.1-pl.transport.zip`
+- MODX 2.8.x: `modxmcp-1.1.0-pl.transport.zip`;
+- MODX 3.x: `modx3mcp-1.1.0-pl.transport.zip`.
 
-It is available in the [MODX3 MCP 1.0.1 release](https://github.com/rumata-estor/modx3-mcp/releases/tag/v1.0.1) and can be installed with the standard MODX package manager.
+Install only the package that matches the MODX major version. Both packages install the same `modxmcp` namespace, settings, MCP endpoint and modular action surface.
 
-The installation creates the MODX3 MCP component, `modxmcp.*` system settings, namespace, manager menu items, API endpoint, and dependency-graph screen. The API token is generated automatically on first install.
+Existing `modxmcp.*` settings and the API token are preserved during reinstall or upgrade.
 
-Existing settings and the API token are preserved during reinstall or upgrade.
+Until the MODX 2 live release-smoke is complete, 1.1.0 is the source/release-candidate version and the latest published stable GitHub release remains 1.0.1.
 
 ## Command-line installation
 
-For servers managed by an agent or automation system, the component can also be installed without registering the package in the MODX package manager:
+The source repository defaults to the MODX 3 build. For an explicit platform build, first create a clean release tree.
+
+MODX 3:
 
 ```bash
-php _build/install.headless.php
-```
-
-If `config.core.php` is outside the project tree:
-
-```bash
+python3 _build/prepare-release.py --platform modx3 --output /tmp/modxmcp-modx3
+cd /tmp/modxmcp-modx3
 MODX_CONFIG_CORE=/full/path/to/config.core.php php _build/install.headless.php
 ```
 
-The installer checks the MODX version, creates the required settings and menu entries, installs the component files, and generates an API token when needed. New files are prepared in temporary directories first; if installation fails, the previous directories are restored.
+MODX 2:
 
-The installer is CLI-only and does not create a browser-accessible installation endpoint.
+```bash
+python3 _build/prepare-release.py --platform modx2 --output /tmp/modxmcp-modx2
+cd /tmp/modxmcp-modx2
+MODX_CONFIG_CORE=/full/path/to/config.core.php php _build/install.headless.php
+```
+
+The prepared tree contains only the selected platform fallback/bootstrap and no source-only legacy/platform templates.
+
+The installer creates the required settings and manager entries and generates an API token when needed. New files are staged before live directories are replaced; existing settings and tokens are preserved on upgrade.
 
 ## Configure an MCP client
 
-For the stable 1.0.1 release:
+For version 1.1.0, pin the release tag after it is published:
 
 ```json
 {
@@ -238,7 +252,7 @@ For the stable 1.0.1 release:
       "command": "npx",
       "args": [
         "-y",
-        "github:rumata-estor/modx3-mcp#v1.0.1"
+        "github:rumata-estor/modx3-mcp#v1.1.0"
       ],
       "env": {
         "MODX_MCP_SITE_URL": "https://example.com/assets/components/modxmcp/api.php",
@@ -249,46 +263,47 @@ For the stable 1.0.1 release:
 }
 ```
 
-For development, use the `main` branch instead of a release tag:
+The Node.js client is the same for MODX 2 and MODX 3; only the server-side transport package differs.
+
+For development or pre-release testing, use:
 
 ```text
 github:rumata-estor/modx3-mcp#main
 ```
 
-For production sites, pinning a specific release is recommended.
+For production sites, pin a published release tag.
 
 ## Release checks
 
 Before a release, the project checks:
 
 - PHP syntax and Node.js client syntax;
-- version consistency and client/server action consistency;
-- installation portability and safe default settings;
-- processor compatibility across several MODX 3 versions;
-- transport-package installation, reinstall with settings preserved, and clean uninstall.
+- version consistency across the shared source and both platform build configs;
+- the complete client/server contract: **182 actions**;
+- modular migration coverage: **74/74 reads + 108/108 mutations**;
+- MODX 2 platform staging and PHP compatibility;
+- MODX 3 processor compatibility across 3.2.2-pl, 3.2.4-pl and current 3.x;
+- installation portability, secure defaults and platform-specific transport requirements;
+- install/reinstall/uninstall smoke cycles on a separate site of the matching MODX major version.
 
-A full test cycle on a separate test site can be run with:
-
-```bash
-MODX_CONFIG_CORE=/full/path/to/config.core.php bash _build/release.smoke.sh
-```
-
-Before version 1.0.0 was published, we also performed a clean installation on MODX Revolution 3.2.4-pl and tested the MCP server, changes to test objects, reinstall with settings preserved, and complete component removal.
+Prepare a platform tree before running a full release smoke for that platform. Never run the destructive release cycle on a production site.
 
 ## Project origin
 
-MODX3 MCP is based on the open-source [**modxMCP**](https://github.com/dampilov94/mcp-component) project, created by [**dampilov94**](https://github.com/dampilov94).
+MODX MCP is based on the open-source [**modxMCP**](https://github.com/dampilov94/mcp-component) project, created by [**dampilov94**](https://github.com/dampilov94).
 
-The original work and attribution are preserved in the project history and license. MODX3 MCP develops that base into a tool for practical AI-agent work with MODX Revolution 3.x, with dependency analysis, controlled write operations, backups, and auditing.
+The original work and attribution are preserved in the project history and license. MODX MCP develops that base into a shared MODX 2/3 platform for practical AI-agent work, with dependency analysis, controlled write operations, backups, auditing and platform-specific adapters.
 
 ## License and release
 
 The project is distributed under the **MIT License**. See [LICENSE](LICENSE).
 
-Current stable release: **[MODX3 MCP 1.0.1](https://github.com/rumata-estor/modx3-mcp/releases/tag/v1.0.1)**.
+Current source/release-candidate version: **1.1.0**.
 
-The release includes the source archive, the MODX transport package, and a SHA-256 checksum file.
+Latest published stable release: **[1.0.1](https://github.com/rumata-estor/modx3-mcp/releases/tag/v1.0.1)** until the dedicated MODX 2 live release-smoke is completed.
+
+The 1.1.0 release is designed to include the source archive plus separate MODX 2 and MODX 3 transport packages and their SHA-256 checksums.
 
 ---
 
-MODX3 MCP can be installed and configured independently using the documentation. In real projects, integration often needs additional work around access permissions, safe workflows, backups, auditing, third-party extras, and the structure of a particular site. This usually requires separate engineering work for the specific project.
+MODX MCP can be installed and configured independently using the documentation. In real projects, integration often needs additional work around access permissions, safe workflows, backups, auditing, third-party extras, and the structure of a particular site. This usually requires separate engineering work for the specific project.

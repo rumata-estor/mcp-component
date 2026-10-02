@@ -64,7 +64,7 @@ if platform_root.exists():
 # Keep internal test connector version aligned with current client while architecture is staged.
 model = core / 'model/modxmcp.class.php'
 text = model.read_text(encoding='utf-8')
-text = re.sub(r"const VERSION = '[^']+';", "const VERSION = '1.0.1';", text, count=1)
+text = re.sub(r"const VERSION = '[^']+';", "const VERSION = '1.1.0';", text, count=1)
 model.write_text(text, encoding='utf-8')
 
 (out / 'BUILD_PLATFORM').write_text(args.platform + '\n', encoding='utf-8')

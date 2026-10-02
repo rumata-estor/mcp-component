@@ -1,8 +1,8 @@
 <?php
-$_lang['setting_modxmcp.enabled'] = 'Enable MODX3 MCP';
-$_lang['setting_modxmcp.enabled_desc'] = 'Globally enables or disables the MODX3 MCP API component. When disabled, all API requests are rejected.';
+$_lang['setting_modxmcp.enabled'] = 'Enable MODX MCP';
+$_lang['setting_modxmcp.enabled_desc'] = 'Globally enables or disables the MODX MCP API component. When disabled, all API requests are rejected.';
 
-$_lang['setting_modxmcp.api_token'] = 'MODX3 MCP API token';
+$_lang['setting_modxmcp.api_token'] = 'MODX MCP API token';
 $_lang['setting_modxmcp.api_token_desc'] = 'Secret token passed in the X-MCP-Token header to authorize all requests to the MCP API.';
 
 $_lang['setting_modxmcp.service_user_id'] = 'Service user ID';

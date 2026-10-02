@@ -14,7 +14,7 @@ with tempfile.TemporaryDirectory() as td:
         if (out/'core/components/modxmcp/legacy').exists(): errors.append(f'{platform}: legacy snapshots leaked into release')
         if (out/'_build/platform').exists(): errors.append(f'{platform}: platform templates leaked into release')
         if f"$modxmcpVariant = '{platform}';" not in api: errors.append(f'{platform}: wrong API wrapper')
-        if "const VERSION = '1.0.1';" not in model: errors.append(f'{platform}: connector version mismatch')
+        if "const VERSION = '1.1.0';" not in model: errors.append(f'{platform}: connector version mismatch')
         if platform=='modx2':
             if "const VARIANT = 'modx2';" not in model: errors.append('modx2: wrong fallback model')
             if "model/modx/modx.class.php" not in builder: errors.append('modx2: wrong builder bootstrap')
