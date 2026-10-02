@@ -6,7 +6,7 @@ use MODX\Revolution\modX;
 
 if (PHP_SAPI !== 'cli') {
     http_response_code(403);
-    die("MODX3 MCP endpoint smoke test is CLI-only.\n");
+    die("MODX MCP endpoint smoke test is CLI-only.\n");
 }
 
 set_time_limit(0);
@@ -341,8 +341,8 @@ if ($readOnly) {
 
 $smokeName = '__modx3mcp_smoke_' . gmdate('Ymd_His') . '_' . bin2hex(random_bytes(4));
 $createdId = 0;
-$content1 = 'MODX3 MCP smoke v1 ' . bin2hex(random_bytes(8));
-$content2 = 'MODX3 MCP smoke v2 ' . bin2hex(random_bytes(8));
+$content1 = 'MODX MCP smoke v1 ' . bin2hex(random_bytes(8));
+$content2 = 'MODX MCP smoke v2 ' . bin2hex(random_bytes(8));
 
 try {
     $created = smokePost($endpoint, $token, 'create_element', 'chunk', array(
